@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:chosen/models/questionnaire.dart';
-import 'package:chosen/utils/questionnaire_manager.dart';
+import 'package:chosen/managers/questionnaire_manager.dart';
 
 class QuestionnaireScreen extends StatefulWidget {
   const QuestionnaireScreen({super.key});

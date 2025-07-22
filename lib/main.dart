@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/questionnaire/questionnaire_screen.dart';
-import 'utils/session_manager.dart';
-import 'package:chosen/utils/questionnaire_manager.dart';
+import 'managers/session_manager.dart';
+import 'package:chosen/managers/questionnaire_manager.dart';
 
 
 void main() {

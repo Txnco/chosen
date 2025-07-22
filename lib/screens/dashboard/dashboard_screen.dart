@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/controllers/auth_controller.dart';
 import 'package:chosen/models/user.dart';
-import 'package:chosen/utils/questionnaire_manager.dart';
+import 'package:chosen/managers/questionnaire_manager.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
