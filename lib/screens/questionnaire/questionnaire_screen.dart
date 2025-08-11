@@ -163,7 +163,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         });
       }
     } catch (e) {
-      print('Error loading questionnaire data: $e');
       // Continue with empty form if both API and local data fail
     }
   }
@@ -281,7 +280,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         }
       }
     } catch (e) {
-      print('Error in _submitQuestionnaire: $e');
       
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();

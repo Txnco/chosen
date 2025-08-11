@@ -20,7 +20,6 @@ class WaterController {
         return _fallbackGoalCalculation();
       }
     } catch (e) {
-      print('Error calculating water goal: $e');
       return _fallbackGoalCalculation();
     }
   }
@@ -56,11 +55,9 @@ class WaterController {
         final responseData = jsonDecode(response.body);
         return WaterIntake.fromJson(responseData);
       } else {
-        print('Failed to add water intake: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error adding water intake: $e');
       return null;
     }
   }
@@ -75,11 +72,9 @@ class WaterController {
         final data = jsonDecode(response.body);
         return WaterStats.fromJson(data);
       } else {
-        print('Failed to get water stats: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error getting water stats: $e');
       return null;
     }
   }
@@ -99,11 +94,9 @@ class WaterController {
         final data = jsonDecode(response.body) as List;
         return data.map((json) => WaterStats.fromJson(json)).toList();
       } else {
-        print('Failed to get weekly water stats: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
-      print('Error getting weekly water stats: $e');
       return [];
     }
   }
@@ -117,11 +110,9 @@ class WaterController {
         final data = jsonDecode(response.body) as List;
         return data.map((json) => WaterStats.fromJson(json)).toList();
       } else {
-        print('Failed to get monthly water stats: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
-      print('Error getting monthly water stats: $e');
       return [];
     }
   }
@@ -138,7 +129,6 @@ class WaterController {
       
       return response.statusCode == 200;
     } catch (e) {
-      print('Error updating water intake: $e');
       return false;
     }
   }
@@ -150,7 +140,6 @@ class WaterController {
       
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      print('Error deleting water intake: $e');
       return false;
     }
   }
@@ -170,7 +159,6 @@ class WaterController {
       }
       return null;
     } catch (e) {
-      print('Error getting water goal: $e');
       return null;
     }
   }
@@ -190,7 +178,6 @@ class WaterController {
       }
       return null;
     } catch (e) {
-      print('Error setting water goal: $e');
       return null;
     }
   }
@@ -212,7 +199,6 @@ class WaterController {
         };
       }
     } catch (e) {
-      print('Error getting water summary: $e');
       // Return dummy data for dashboard
       return {
         'current_intake': 1200.0,
@@ -228,7 +214,6 @@ class WaterController {
     try {
       await _storage.write(key: 'water_$key', value: jsonEncode(data));
     } catch (e) {
-      print('Error caching water data: $e');
     }
   }
   
@@ -241,7 +226,6 @@ class WaterController {
       }
       return null;
     } catch (e) {
-      print('Error getting cached water data: $e');
       return null;
     }
   }
@@ -256,7 +240,6 @@ class WaterController {
         await _storage.delete(key: key);
       }
     } catch (e) {
-      print('Error clearing water cache: $e');
     }
   }
 }

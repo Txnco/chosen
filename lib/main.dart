@@ -6,6 +6,7 @@ import 'managers/session_manager.dart';
 import 'package:chosen/managers/questionnaire_manager.dart';
 import 'screens/messaging/messaging_screen.dart';
 import 'screens/water/water_tracking_screen.dart';
+import 'screens/settings/settings_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -73,6 +74,7 @@ class MyApp extends StatelessWidget {
         '/questionnaire': (context) => const QuestionnaireScreen(),
         '/messaging': (context) => const MessagingScreen(),
         '/water-tracking': (context) => const WaterTrackingScreen(),
+        '/settings': (context) => const SettingsScreen(),
       },
     );
   }

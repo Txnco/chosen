@@ -38,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       // If questionnaire is completed, load user data
       await _loadUser();
     } catch (e) {
-      print('Error initializing dashboard: $e');
       // On error, redirect to login
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/login');
@@ -164,15 +163,13 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           }),
           _buildNavItem(Icons.fitness_center_outlined, false, () {
             // TODO: Navigate to workout/fitness screen
-            print('Navigate to fitness');
           }),
           _buildNavItem(Icons.chat_outlined, false, () {
             // Navigate to messaging screen
             Navigator.pushNamed(context, '/messaging');
           }),
           _buildNavItem(Icons.settings_outlined, false, () {
-            // TODO: Navigate to settings screen
-            print('Navigate to settings');
+            Navigator.pushNamed(context, '/settings');
           }),
         ],
       ),
@@ -229,7 +226,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       ),
       child: PopupMenuButton<String>(
         onSelected: (value) async {
-          if (value == 'logout') {
+          if (value == 'settings') {
+            Navigator.pushNamed(context, '/settings');
+          } else if (value == 'logout') {
             await _authController.logout();
             if (context.mounted) {
               Navigator.pushReplacementNamed(context, '/login');

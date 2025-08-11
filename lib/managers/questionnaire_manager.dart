@@ -26,14 +26,12 @@ class QuestionnaireManager {
         return false;
       }
     } catch (e) {
-      print('Error checking questionnaire completion from API: $e');
       
       // Fallback to local storage if API fails
       try {
         final prefs = await SharedPreferences.getInstance();
         return prefs.getBool(_keyQuestionnaireCompleted) ?? false;
       } catch (e) {
-        print('Error checking local questionnaire completion: $e');
         return false;
       }
     }
@@ -56,7 +54,6 @@ class QuestionnaireManager {
       // Clear draft data when completed
       await clearDraftQuestionnaire();
     } catch (e) {
-      print('Error marking questionnaire as completed: $e');
     }
   }
 
@@ -94,7 +91,6 @@ class QuestionnaireManager {
       };
       
     } catch (e) {
-      print('Error getting questionnaire progress: $e');
       return null;
     }
   }
@@ -106,7 +102,6 @@ class QuestionnaireManager {
       await prefs.setString(_keyQuestionnaireDraft, json.encode(data));
       await prefs.setInt(_keyCurrentStep, currentStep);
     } catch (e) {
-      print('Error saving draft questionnaire: $e');
     }
   }
 
@@ -120,7 +115,6 @@ class QuestionnaireManager {
       }
       return null;
     } catch (e) {
-      print('Error getting draft questionnaire: $e');
       return null;
     }
   }
@@ -131,7 +125,6 @@ class QuestionnaireManager {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getInt(_keyCurrentStep) ?? 0;
     } catch (e) {
-      print('Error getting current step: $e');
       return 0;
     }
   }
@@ -143,7 +136,6 @@ class QuestionnaireManager {
       await prefs.remove(_keyQuestionnaireDraft);
       await prefs.remove(_keyCurrentStep);
     } catch (e) {
-      print('Error clearing draft questionnaire: $e');
     }
   }
 
@@ -160,7 +152,6 @@ class QuestionnaireManager {
       }
       return false;
     } catch (e) {
-      print('Error completing questionnaire: $e');
       return false;
     }
   }
@@ -172,7 +163,6 @@ class QuestionnaireManager {
       await prefs.setBool(_keyQuestionnaireCompleted, false);
       await clearDraftQuestionnaire();
     } catch (e) {
-      print('Error resetting questionnaire: $e');
     }
   }
 

@@ -16,11 +16,9 @@ class MessageController {
         final data = jsonDecode(response.body) as List;
         return data.map((json) => Conversation.fromJson(json)).toList();
       } else {
-        print('Failed to get conversations: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
-      print('Error getting conversations: $e');
       return [];
     }
   }
@@ -35,11 +33,9 @@ class MessageController {
         final messages = data['messages'] as List;
         return messages.map((json) => Message.fromJson(json)).toList();
       } else {
-        print('Failed to get messages: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
-      print('Error getting messages: $e');
       return [];
     }
   }
@@ -59,11 +55,9 @@ class MessageController {
         final responseData = jsonDecode(response.body);
         return Message.fromJson(responseData);
       } else {
-        print('Failed to send message: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error sending message: $e');
       return null;
     }
   }
@@ -90,11 +84,9 @@ class MessageController {
         final responseData = jsonDecode(response.body);
         return Message.fromJson(responseData);
       } else {
-        print('Failed to send image message: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error sending image message: $e');
       return null;
     }
   }
@@ -120,11 +112,9 @@ class MessageController {
         final responseData = jsonDecode(response.body);
         return Message.fromJson(responseData);
       } else {
-        print('Failed to send audio message: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error sending audio message: $e');
       return null;
     }
   }
@@ -148,7 +138,6 @@ class MessageController {
       
       return uploadResponse;
     } catch (e) {
-      print('Error uploading file: $e');
       return null;
     }
   }
@@ -162,7 +151,6 @@ class MessageController {
       
       return response.statusCode == 200;
     } catch (e) {
-      print('Error marking messages as read: $e');
       return false;
     }
   }
@@ -178,7 +166,6 @@ class MessageController {
       }
       return 0;
     } catch (e) {
-      print('Error getting unread count: $e');
       return 0;
     }
   }
@@ -194,11 +181,9 @@ class MessageController {
         final responseData = jsonDecode(response.body);
         return Conversation.fromJson(responseData);
       } else {
-        print('Failed to create/get conversation: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error creating/getting conversation: $e');
       return null;
     }
   }
@@ -209,7 +194,6 @@ class MessageController {
       final response = await ChosenApi.delete('/conversations/$conversationId');
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      print('Error deleting conversation: $e');
       return false;
     }
   }
@@ -220,7 +204,6 @@ class MessageController {
       final response = await ChosenApi.delete('/conversations/$conversationId/messages');
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      print('Error clearing conversation: $e');
       return false;
     }
   }
@@ -240,7 +223,6 @@ class MessageController {
       }
       return [];
     } catch (e) {
-      print('Error searching messages: $e');
       return [];
     }
   }
@@ -258,7 +240,6 @@ class MessageController {
       }
       return {};
     } catch (e) {
-      print('Error getting online status: $e');
       return {};
     }
   }
@@ -272,7 +253,6 @@ class MessageController {
         value: jsonEncode(conversationsJson),
       );
     } catch (e) {
-      print('Error caching conversations: $e');
     }
   }
   
@@ -286,7 +266,6 @@ class MessageController {
       }
       return [];
     } catch (e) {
-      print('Error getting cached conversations: $e');
       return [];
     }
   }
@@ -296,7 +275,6 @@ class MessageController {
     try {
       await _storage.delete(key: 'cached_conversations');
     } catch (e) {
-      print('Error clearing message cache: $e');
     }
   }
 }

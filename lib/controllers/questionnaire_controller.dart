@@ -28,11 +28,9 @@ class QuestionnaireController {
         
         return createdQuestionnaire;
       } else {
-        print('Failed to save questionnaire: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error saving questionnaire: $e');
       return null;
     }
   }
@@ -56,11 +54,9 @@ class QuestionnaireController {
         
         return true;
       } else {
-        print('Failed to update questionnaire: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Error updating questionnaire: $e');
       return false;
     }
   }
@@ -80,11 +76,9 @@ class QuestionnaireController {
           return Questionnaire.fromJson(jsonDecode(localData));
         }
         
-        print('Failed to get questionnaire: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error getting questionnaire: $e');
       
       // Fallback to local storage
       try {
@@ -93,7 +87,6 @@ class QuestionnaireController {
           return Questionnaire.fromJson(jsonDecode(localData));
         }
       } catch (localError) {
-        print('Error reading from local storage: $localError');
       }
       
       return null;
@@ -119,11 +112,9 @@ class QuestionnaireController {
         // No questionnaire found
         return null;
       } else {
-        print('Failed to get questionnaire: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error getting questionnaire: $e');
       return null;
     }
   }
@@ -139,11 +130,9 @@ class QuestionnaireController {
         await _storage.delete(key: 'questionnaire_$id');
         return true;
       } else {
-        print('Failed to delete questionnaire: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Error deleting questionnaire: $e');
       return false;
     }
   }
@@ -161,11 +150,9 @@ class QuestionnaireController {
         final responseData = jsonDecode(response.body);
         return Questionnaire.fromJson(responseData);
       } else {
-        print('Failed to save questionnaire for user: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error saving questionnaire for user: $e');
       return null;
     }
   }
@@ -181,7 +168,6 @@ class QuestionnaireController {
         await _storage.delete(key: key);
       }
     } catch (e) {
-      print('Error clearing local data: $e');
     }
   }
 }
