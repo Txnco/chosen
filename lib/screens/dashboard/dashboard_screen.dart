@@ -159,22 +159,37 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildNavItem(Icons.home_outlined, true),
-          _buildNavItem(Icons.fitness_center_outlined, false),
-          _buildNavItem(Icons.chat_outlined, false),
-          _buildNavItem(Icons.settings_outlined, false),
+          _buildNavItem(Icons.home_outlined, true, () {
+            // Already on dashboard, do nothing or refresh
+          }),
+          _buildNavItem(Icons.fitness_center_outlined, false, () {
+            // TODO: Navigate to workout/fitness screen
+            print('Navigate to fitness');
+          }),
+          _buildNavItem(Icons.chat_outlined, false, () {
+            // Navigate to messaging screen
+            Navigator.pushNamed(context, '/messaging');
+          }),
+          _buildNavItem(Icons.settings_outlined, false, () {
+            // TODO: Navigate to settings screen
+            print('Navigate to settings');
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, bool isActive) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Icon(
-        icon,
-        color: isActive ? Colors.black : Colors.grey[400],
-        size: 24,
+  Widget _buildNavItem(IconData icon, bool isActive, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Icon(
+          icon,
+          color: isActive ? Colors.black : Colors.grey[400],
+          size: 24,
+        ),
       ),
     );
   }
@@ -308,7 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     );
   }
 
-  Widget _buildDashboardGrid() {
+ Widget _buildDashboardGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: GridView.count(
@@ -319,54 +334,205 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         mainAxisSpacing: 16,
         childAspectRatio: 1.2,
         children: [
-          _buildDashboardCard('Dnevni plan', Icons.today_outlined, '5 tasks'),
-          _buildDashboardCard('Motivacija dana', Icons.bolt_outlined, 'Samo nastavi!'),
-          _buildDashboardCard('Unos vode', Icons.water_drop_outlined, '1.2L / 2.5L'),
-          _buildDashboardCard('Trening', Icons.fitness_center_outlined, '45 min'),
+          _buildDashboardCard(
+            'Dnevni plan', 
+            Icons.today_outlined, 
+            '5 tasks',
+            onTap: () {
+              // TODO: Navigate to daily plan
+            },
+          ),
+          _buildDashboardCard(
+            'Motivacija dana', 
+            Icons.bolt_outlined, 
+            'Samo nastavi!',
+            onTap: () {
+              // TODO: Navigate to motivation
+            },
+          ),
+          _buildWaterCard(), // Special water card with plus icon
+          _buildDashboardCard(
+            'Trening', 
+            Icons.fitness_center_outlined, 
+            '45 min',
+            onTap: () {
+              // TODO: Navigate to workout
+            },
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDashboardCard(String title, IconData icon, String subtitle) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 32, color: Colors.black),
-            const Spacer(),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+  Widget _buildDashboardCard(String title, IconData icon, String subtitle, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 32, color: Colors.black),
+              const Spacer(),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWaterCard() {
+    // Dummy data - will be calculated from user's questionnaire
+    const double currentIntake = 1200; // ml
+    const double dailyGoal = 2500; // ml
+    final double progress = currentIntake / dailyGoal;
+    
+    return InkWell(
+      onTap: () {
+        Navigator.pushNamed(context, '/water-tracking');
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.water_drop_outlined, size: 32, color: Colors.black),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => _showQuickAddWater(),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              const Text(
+                'Unos vode',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(
+                    '${currentIntake.toInt()}ml',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue[600],
+                    ),
+                  ),
+                  Text(
+                    ' / ${dailyGoal.toInt()}ml',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Mini progress bar
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progress.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: progress < 0.5 ? Colors.orange[400] : Colors.blue[600],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQuickAddWater() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _QuickAddWaterModal(
+        onAddWater: (amount) {
+          // TODO: Add water to API and update dashboard
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Dodano ${amount.toInt()}ml vode!'),
+              backgroundColor: Colors.blue[600],
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
       ),
     );
   }
@@ -434,6 +600,121 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickAddWaterModal extends StatelessWidget {
+  final Function(double amount) onAddWater;
+
+  const _QuickAddWaterModal({required this.onAddWater});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Icon(
+              Icons.water_drop,
+              size: 60,
+              color: Colors.blue[600],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Brzi unos vode',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildQuickButton(context, 250),
+                _buildQuickButton(context, 500),
+                _buildQuickButton(context, 750),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/water-tracking');
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: const BorderSide(color: Colors.black),
+                ),
+                child: const Text(
+                  'Otvori detaljni prikaz',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickButton(BuildContext context, int amount) {
+    return GestureDetector(
+      onTap: () {
+        onAddWater(amount.toDouble());
+        Navigator.pop(context);
+      },
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue[200]!),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.water_drop_outlined, color: Colors.blue[600], size: 24),
+            const SizedBox(height: 4),
+            Text(
+              '${amount}ml',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.blue[600],
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
