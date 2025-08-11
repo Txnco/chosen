@@ -161,7 +161,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         children: [
           _buildNavItem(Icons.home_outlined, true),
           _buildNavItem(Icons.fitness_center_outlined, false),
-          _buildNavItem(Icons.local_drink_outlined, false),
+          _buildNavItem(Icons.chat_outlined, false),
           _buildNavItem(Icons.settings_outlined, false),
         ],
       ),

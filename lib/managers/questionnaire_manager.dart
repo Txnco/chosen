@@ -11,12 +11,41 @@ class QuestionnaireManager {
   // Check if questionnaire is completed
   static Future<bool> isQuestionnaireCompleted() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(_keyQuestionnaireCompleted) ?? false;
+      final questionnaire = await QuestionnaireController.getUserQuestionnaire();
+
+      if(questionnaire != null) {
+        bool isCompleted = isQuestionnaireComplete(questionnaire);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyQuestionnaireCompleted, isCompleted);
+
+        return isCompleted;
+      }else{
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_keyQuestionnaireCompleted, false);
+        return false;
+      }
     } catch (e) {
-      print('Error checking questionnaire completion: $e');
-      return false;
+      print('Error checking questionnaire completion from API: $e');
+      
+      // Fallback to local storage if API fails
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        return prefs.getBool(_keyQuestionnaireCompleted) ?? false;
+      } catch (e) {
+        print('Error checking local questionnaire completion: $e');
+        return false;
+      }
     }
+  }
+
+  static bool isQuestionnaireComplete(Questionnaire questionnaire) {
+    // Define required fields for completion
+     return (questionnaire.weight != null && questionnaire.weight! > 0) &&
+         (questionnaire.height != null && questionnaire.height! > 0) &&
+         (questionnaire.age != null && questionnaire.age! > 0) &&
+         questionnaire.trainingEnvironment.isNotEmpty &&
+         questionnaire.workShift.isNotEmpty;
   }
 
   // Mark questionnaire as completed
@@ -28,6 +57,45 @@ class QuestionnaireManager {
       await clearDraftQuestionnaire();
     } catch (e) {
       print('Error marking questionnaire as completed: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getQuestionnaireProgress() async {
+    try {
+      final questionnaire = await QuestionnaireController.getUserQuestionnaire();
+      
+      if (questionnaire == null) {
+        return null; // No questionnaire exists
+      }
+
+      // Convert questionnaire to map and determine current step
+      Map<String, dynamic> data = {
+        'weight': questionnaire.weight,
+        'height': questionnaire.height,
+        'age': questionnaire.age,
+        'healthIssues': questionnaire.healthIssues,
+        'badHabits': questionnaire.badHabits,
+        'trainingEnvironment': questionnaire.trainingEnvironment,
+        'workShift': questionnaire.workShift,
+        'wakeUpTime': '${questionnaire.wakeUpTime.hour.toString().padLeft(2, '0')}:${questionnaire.wakeUpTime.minute.toString().padLeft(2, '0')}',
+        'sleepTime': '${questionnaire.sleepTime.hour.toString().padLeft(2, '0')}:${questionnaire.sleepTime.minute.toString().padLeft(2, '0')}',
+        'morningRoutine': questionnaire.morningRoutine,
+        'eveningRoutine': questionnaire.eveningRoutine,
+      };
+
+
+      // Determine incomplete step
+      int currentStep = getIncompleteStep(data);
+      
+      return {
+        'questionnaire_data': data,
+        'current_step': currentStep,
+        'is_complete': isQuestionnaireComplete(questionnaire)
+      };
+      
+    } catch (e) {
+      print('Error getting questionnaire progress: $e');
+      return null;
     }
   }
 
@@ -114,10 +182,14 @@ class QuestionnaireManager {
       'weight',
       'height', 
       'age',
+      'healthIssues',
+      'badHabits',
       'trainingEnvironment',
       'workShift',
       'wakeUpTime',
       'sleepTime',
+      'morningRoutine',
+      'eveningRoutine',
     ];
 
     for (int i = 0; i < requiredFields.length; i++) {
@@ -130,14 +202,8 @@ class QuestionnaireManager {
       }
     }
     
-    // If all required fields are present, check optional fields
-    if (!data.containsKey('healthIssues') || 
-        !data.containsKey('badHabits') ||
-        !data.containsKey('morningRoutine') ||
-        !data.containsKey('eveningRoutine')) {
-      return 7; // Return step for optional fields
-    }
-    
     return 9; // All fields completed, go to final step
   }
+
+
 }

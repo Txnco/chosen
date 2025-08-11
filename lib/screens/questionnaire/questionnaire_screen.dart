@@ -52,52 +52,119 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
   // Load draft data if available
   Future<void> _loadDraftData() async {
-    final draftData = await QuestionnaireManager.getDraftQuestionnaire();
-    final currentStep = await QuestionnaireManager.getCurrentStep();
-    
-    if (draftData != null) {
-      setState(() {
-        _currentStep = currentStep;
-        
-        // Load text fields
-        _weightController.text = draftData['weight']?.toString() ?? '';
-        _heightController.text = draftData['height']?.toString() ?? '';
-        _ageController.text = draftData['age']?.toString() ?? '';
-        _healthIssuesController.text = draftData['healthIssues'] ?? '';
-        _badHabitsController.text = draftData['badHabits'] ?? '';
-        _morningRoutineController.text = draftData['morningRoutine'] ?? '';
-        _eveningRoutineController.text = draftData['eveningRoutine'] ?? '';
-        
-        // Load selection values
-        _trainingEnvironment = draftData['trainingEnvironment'] ?? '';
-        _workShift = draftData['workShift'] ?? '';
-        
-        // Load times
-        if (draftData['wakeUpTime'] != null) {
-          final parts = draftData['wakeUpTime'].split(':');
-          _wakeUpTime = TimeOfDay(
-            hour: int.parse(parts[0]),
-            minute: int.parse(parts[1]),
-          );
-        }
-        
-        if (draftData['sleepTime'] != null) {
-          final parts = draftData['sleepTime'].split(':');
-          _sleepTime = TimeOfDay(
-            hour: int.parse(parts[0]),
-            minute: int.parse(parts[1]),
-          );
-        }
-      });
+    try {
+      // First, try to get questionnaire progress from API
+      final progress = await QuestionnaireManager.getQuestionnaireProgress();
       
-      // Navigate to the current step
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _pageController.animateToPage(
-          _currentStep,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      });
+      if (progress != null) {
+        final questionnaireData = progress['questionnaire_data'] as Map<String, dynamic>;
+        final currentStep = progress['current_step'] as int;
+        final isComplete = progress['is_complete'] as bool;
+        
+        if (isComplete) {
+          // Questionnaire is complete, redirect to dashboard
+          Navigator.pushReplacementNamed(context, '/dashboard');
+          return;
+        }
+        
+        // Load data from API
+        setState(() {
+          _currentStep = currentStep;
+          
+          // Load text fields
+          _weightController.text = questionnaireData['weight']?.toString() ?? '';
+          _heightController.text = questionnaireData['height']?.toString() ?? '';
+          _ageController.text = questionnaireData['age']?.toString() ?? '';
+          _healthIssuesController.text = questionnaireData['healthIssues'] ?? '';
+          _badHabitsController.text = questionnaireData['badHabits'] ?? '';
+          _morningRoutineController.text = questionnaireData['morningRoutine'] ?? '';
+          _eveningRoutineController.text = questionnaireData['eveningRoutine'] ?? '';
+          
+          // Load selection values
+          _trainingEnvironment = questionnaireData['trainingEnvironment'] ?? '';
+          _workShift = questionnaireData['workShift'] ?? '';
+          
+          // Load times
+          if (questionnaireData['wakeUpTime'] != null) {
+            final parts = questionnaireData['wakeUpTime'].split(':');
+            _wakeUpTime = TimeOfDay(
+              hour: int.parse(parts[0]),
+              minute: int.parse(parts[1]),
+            );
+          }
+          
+          if (questionnaireData['sleepTime'] != null) {
+            final parts = questionnaireData['sleepTime'].split(':');
+            _sleepTime = TimeOfDay(
+              hour: int.parse(parts[0]),
+              minute: int.parse(parts[1]),
+            );
+          }
+        });
+        
+        // Navigate to the current step
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _pageController.animateToPage(
+            _currentStep,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        });
+        
+        return;
+      }
+      
+      // Fallback to draft data if no API data exists
+      final draftData = await QuestionnaireManager.getDraftQuestionnaire();
+      final currentStep = await QuestionnaireManager.getCurrentStep();
+      
+      if (draftData != null) {
+        setState(() {
+          _currentStep = currentStep;
+          
+          // Load text fields
+          _weightController.text = draftData['weight']?.toString() ?? '';
+          _heightController.text = draftData['height']?.toString() ?? '';
+          _ageController.text = draftData['age']?.toString() ?? '';
+          _healthIssuesController.text = draftData['healthIssues'] ?? '';
+          _badHabitsController.text = draftData['badHabits'] ?? '';
+          _morningRoutineController.text = draftData['morningRoutine'] ?? '';
+          _eveningRoutineController.text = draftData['eveningRoutine'] ?? '';
+          
+          // Load selection values
+          _trainingEnvironment = draftData['trainingEnvironment'] ?? '';
+          _workShift = draftData['workShift'] ?? '';
+          
+          // Load times
+          if (draftData['wakeUpTime'] != null) {
+            final parts = draftData['wakeUpTime'].split(':');
+            _wakeUpTime = TimeOfDay(
+              hour: int.parse(parts[0]),
+              minute: int.parse(parts[1]),
+            );
+          }
+          
+          if (draftData['sleepTime'] != null) {
+            final parts = draftData['sleepTime'].split(':');
+            _sleepTime = TimeOfDay(
+              hour: int.parse(parts[0]),
+              minute: int.parse(parts[1]),
+            );
+          }
+        });
+        
+        // Navigate to the current step
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _pageController.animateToPage(
+            _currentStep,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        });
+      }
+    } catch (e) {
+      print('Error loading questionnaire data: $e');
+      // Continue with empty form if both API and local data fail
     }
   }
 
@@ -112,11 +179,11 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       'trainingEnvironment': _trainingEnvironment,
       'workShift': _workShift,
       'wakeUpTime': _wakeUpTime != null 
-        ? '${_wakeUpTime!.hour.toString().padLeft(2, '0')}:${_wakeUpTime!.minute.toString().padLeft(2, '0')}'
-        : null,
+      ? '${_wakeUpTime!.hour.toString().padLeft(2, '0')}:${_wakeUpTime!.minute.toString().padLeft(2, '0')}'
+      : null,
       'sleepTime': _sleepTime != null
-        ? '${_sleepTime!.hour.toString().padLeft(2, '0')}:${_sleepTime!.minute.toString().padLeft(2, '0')}'
-        : null,
+      ? '${_sleepTime!.hour.toString().padLeft(2, '0')}:${_sleepTime!.minute.toString().padLeft(2, '0')}'
+      : null,
       'morningRoutine': _morningRoutineController.text,
       'eveningRoutine': _eveningRoutineController.text,
     };
@@ -178,12 +245,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         badHabits: _badHabitsController.text,
         trainingEnvironment: _trainingEnvironment,
         workShift: _workShift,
-        wakeUpTime: _wakeUpTime != null 
-          ? DateTime(2024, 1, 1, _wakeUpTime!.hour, _wakeUpTime!.minute)
-          : DateTime.now(),
-        sleepTime: _sleepTime != null
-          ? DateTime(2024, 1, 1, _sleepTime!.hour, _sleepTime!.minute)
-          : DateTime.now(),
+        wakeUpTime: _wakeUpTime ?? const TimeOfDay(hour: 7, minute: 0), // Default to 7:00 AM
+        sleepTime: _sleepTime ?? const TimeOfDay(hour: 23, minute: 0),
         morningRoutine: _morningRoutineController.text,
         eveningRoutine: _eveningRoutineController.text,
         createdAt: DateTime.now(),
@@ -516,10 +579,11 @@ Widget _buildSelectionOptions({
   Widget _buildWorkShiftStep() {
     // Define enum-like values and their display text
     final Map<String, String> workShiftOptions = {
-      'day_shift': 'Day Shift',
-      'night_shift': 'Night Shift',
+      'morning': 'Morning Shift',
+      'afternoon': 'Afternoon Shift', 
+      'night': 'Night Shift',
+      'split': 'Split Shift',
       'flexible': 'Flexible',
-      'part_time': 'Part-time',
     };
 
     return _buildStepContainer(

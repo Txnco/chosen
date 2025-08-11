@@ -100,23 +100,34 @@ class QuestionnaireController {
     }
   }
   
-  /// Get all questionnaires for current user
-  static Future<List<Questionnaire>> getUserQuestionnaires() async {
+
+  static Future<Questionnaire?> getUserQuestionnaire() async {
     try {
-      final response = await ChosenApi.get('/questionnaires');
-      
+      final response = await ChosenApi.get('/questionnaire/');
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        return data.map((json) => Questionnaire.fromJson(json)).toList();
+        final responseData = jsonDecode(response.body);
+        
+        // Check if response is null (no questionnaire exists)
+        if (responseData == null) {
+          return null;
+        }
+        
+        // Parse and return questionnaire
+        return Questionnaire.fromJson(responseData);
+      } else if (response.statusCode == 404) {
+        // No questionnaire found
+        return null;
       } else {
-        print('Failed to get questionnaires: ${response.statusCode} - ${response.body}');
-        return [];
+        print('Failed to get questionnaire: ${response.statusCode} - ${response.body}');
+        return null;
       }
     } catch (e) {
-      print('Error getting questionnaires: $e');
-      return [];
+      print('Error getting questionnaire: $e');
+      return null;
     }
   }
+
   
   /// Delete questionnaire
   static Future<bool> deleteQuestionnaire(String id) async {
