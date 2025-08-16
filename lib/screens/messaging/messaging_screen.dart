@@ -113,7 +113,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
     final now = DateTime.now();
     final difference = now.difference(time);
     
-    if (difference.inMinutes < 60) {
+    if(difference.inSeconds < 60){
+      return '${difference.inSeconds}s';
+    } else if (difference.inMinutes < 60) {
       return '${difference.inMinutes}m';
     } else if (difference.inHours < 24) {
       return '${difference.inHours}h';
