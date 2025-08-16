@@ -5,7 +5,7 @@ class Questionnaire {
   final int? userId;       
   final double? weight;
   final double? height;
-  final int? age;
+  final DateTime? birthday;
   final String? healthIssues;
   final String? badHabits;
   final String trainingEnvironment;
@@ -22,7 +22,7 @@ class Questionnaire {
     this.userId,           
     this.weight,
     this.height,
-    this.age,
+    this.birthday,
     this.healthIssues,
     this.badHabits,
     required this.trainingEnvironment,
@@ -34,13 +34,24 @@ class Questionnaire {
     required this.createdAt,
     required this.updatedAt,
   });
+
+   int? get calculatedAge {
+    if (birthday == null) return null;
+    final now = DateTime.now();
+    int age = now.year - birthday!.year;
+    if (now.month < birthday!.month || 
+        (now.month == birthday!.month && now.day < birthday!.day)) {
+      age--;
+    }
+    return age;
+  }
   
 
   // For creating new questionnaire (no id, no userId in JSON)
   Map<String, dynamic> toJson() => {
     "weight": weight,
     "height": height,
-    "age": age,
+   "birthday": birthday?.toIso8601String(),
     "health_issues": healthIssues,
     "bad_habits": badHabits,
     "workout_environment": trainingEnvironment.toLowerCase(),
@@ -57,7 +68,7 @@ class Questionnaire {
     if (userId != null) "user_id": userId,
     "weight": weight,
     "height": height,
-    "age": age,
+    "birthday": birthday?.toIso8601String(),
     "health_issues": healthIssues,
     "bad_habits": badHabits,
     "workout_environment": trainingEnvironment,
@@ -96,7 +107,7 @@ class Questionnaire {
       userId: json['user_id'],
       weight: (json['weight'] as num?)?.toDouble(),
       height: (json['height'] as num?)?.toDouble(),
-      age: json['age'] as int?,
+      birthday: json['birthday'] != null ? DateTime.parse(json['birthday']) : null,
       healthIssues: json['health_issues'],
       badHabits: json['bad_habits'],
       trainingEnvironment: json['workout_environment'] ?? '',
@@ -116,7 +127,7 @@ class Questionnaire {
     int? userId,
     double? weight,
     double? height,
-    int? age,
+    DateTime? birthday,
     String? healthIssues,
     String? badHabits,
     String? trainingEnvironment,
@@ -133,7 +144,7 @@ class Questionnaire {
       userId: userId ?? this.userId,
       weight: weight ?? this.weight,
       height: height ?? this.height,
-      age: age ?? this.age,
+      birthday: birthday ?? this.birthday,
       healthIssues: healthIssues ?? this.healthIssues,
       badHabits: badHabits ?? this.badHabits,
       trainingEnvironment: trainingEnvironment ?? this.trainingEnvironment,

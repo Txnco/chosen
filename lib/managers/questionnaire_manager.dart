@@ -41,7 +41,7 @@ class QuestionnaireManager {
     // Define required fields for completion
      return (questionnaire.weight != null && questionnaire.weight! > 0) &&
          (questionnaire.height != null && questionnaire.height! > 0) &&
-         (questionnaire.age != null && questionnaire.age! > 0) &&
+         (questionnaire.birthday != null) && 
          questionnaire.trainingEnvironment.isNotEmpty &&
          questionnaire.workShift.isNotEmpty;
   }
@@ -69,7 +69,7 @@ class QuestionnaireManager {
       Map<String, dynamic> data = {
         'weight': questionnaire.weight,
         'height': questionnaire.height,
-        'age': questionnaire.age,
+        'birthday': questionnaire.birthday?.toIso8601String(),
         'healthIssues': questionnaire.healthIssues,
         'badHabits': questionnaire.badHabits,
         'trainingEnvironment': questionnaire.trainingEnvironment,

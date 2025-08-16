@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:chosen/models/questionnaire.dart';
@@ -19,9 +18,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   // Form controllers
   final _weightController = TextEditingController();
   final _heightController = TextEditingController();
-  final _ageController = TextEditingController();
-  final _healthIssuesController = TextEditingController();
-  final _badHabitsController = TextEditingController();
   final _morningRoutineController = TextEditingController();
   final _eveningRoutineController = TextEditingController();
 
@@ -30,6 +26,9 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   String _workShift = '';
   TimeOfDay? _wakeUpTime;
   TimeOfDay? _sleepTime;
+  DateTime? _birthday;
+  String _healthIssues = '';
+  String _badHabits = '';
 
   @override
   void initState() {
@@ -41,13 +40,22 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   void dispose() {
     _weightController.dispose();
     _heightController.dispose();
-    _ageController.dispose();
-    _healthIssuesController.dispose();
-    _badHabitsController.dispose();
     _morningRoutineController.dispose();
     _eveningRoutineController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  // Calculate age from birthday
+  int? get _calculatedAge {
+    if (_birthday == null) return null;
+    final now = DateTime.now();
+    int age = now.year - _birthday!.year;
+    if (now.month < _birthday!.month || 
+        (now.month == _birthday!.month && now.day < _birthday!.day)) {
+      age--;
+    }
+    return age;
   }
 
   // Load draft data if available
@@ -74,11 +82,15 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
           // Load text fields
           _weightController.text = questionnaireData['weight']?.toString() ?? '';
           _heightController.text = questionnaireData['height']?.toString() ?? '';
-          _ageController.text = questionnaireData['age']?.toString() ?? '';
-          _healthIssuesController.text = questionnaireData['healthIssues'] ?? '';
-          _badHabitsController.text = questionnaireData['badHabits'] ?? '';
+          _healthIssues = questionnaireData['healthIssues'] ?? '';
+          _badHabits = questionnaireData['badHabits'] ?? '';
           _morningRoutineController.text = questionnaireData['morningRoutine'] ?? '';
           _eveningRoutineController.text = questionnaireData['eveningRoutine'] ?? '';
+          
+          // Load birthday directly from API
+          if (questionnaireData['birthday'] != null) {
+            _birthday = DateTime.parse(questionnaireData['birthday']);
+          }
           
           // Load selection values
           _trainingEnvironment = questionnaireData['trainingEnvironment'] ?? '';
@@ -125,11 +137,15 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
           // Load text fields
           _weightController.text = draftData['weight']?.toString() ?? '';
           _heightController.text = draftData['height']?.toString() ?? '';
-          _ageController.text = draftData['age']?.toString() ?? '';
-          _healthIssuesController.text = draftData['healthIssues'] ?? '';
-          _badHabitsController.text = draftData['badHabits'] ?? '';
+          _healthIssues = draftData['healthIssues'] ?? '';
+          _badHabits = draftData['badHabits'] ?? '';
           _morningRoutineController.text = draftData['morningRoutine'] ?? '';
           _eveningRoutineController.text = draftData['eveningRoutine'] ?? '';
+          
+          // Load birthday
+          if (draftData['birthday'] != null) {
+            _birthday = DateTime.parse(draftData['birthday']);
+          }
           
           // Load selection values
           _trainingEnvironment = draftData['trainingEnvironment'] ?? '';
@@ -172,9 +188,9 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     final data = {
       'weight': double.tryParse(_weightController.text),
       'height': double.tryParse(_heightController.text),
-      'age': int.tryParse(_ageController.text),
-      'healthIssues': _healthIssuesController.text,
-      'badHabits': _badHabitsController.text,
+      'birthday': _birthday?.toIso8601String(), // Save birthday directly
+      'healthIssues': _healthIssues,
+      'badHabits': _badHabits,
       'trainingEnvironment': _trainingEnvironment,
       'workShift': _workShift,
       'wakeUpTime': _wakeUpTime != null 
@@ -190,7 +206,59 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     await QuestionnaireManager.saveDraftQuestionnaire(data, _currentStep);
   }
 
+  // Validate current step
+  bool _isCurrentStepValid() {
+    switch (_currentStep) {
+      case 0: // Weight
+        return _weightController.text.isNotEmpty && 
+               double.tryParse(_weightController.text) != null &&
+               double.parse(_weightController.text) > 0;
+      case 1: // Height
+        return _heightController.text.isNotEmpty && 
+               double.tryParse(_heightController.text) != null &&
+               double.parse(_heightController.text) > 0;
+      case 2: // Birthday
+        return _birthday != null;
+      case 3: // Health Issues
+        return _healthIssues.isNotEmpty;
+      case 4: // Bad Habits
+        return _badHabits.isNotEmpty;
+      case 5: // Training Environment
+        return _trainingEnvironment.isNotEmpty;
+      case 6: // Work Shift
+        return _workShift.isNotEmpty;
+      case 7: // Wake Up Time
+        return _wakeUpTime != null;
+      case 8: // Sleep Time
+        return _sleepTime != null;
+      case 9: // Routines
+        return _morningRoutineController.text.isNotEmpty && 
+               _eveningRoutineController.text.isNotEmpty;
+      default:
+        return false;
+    }
+  }
+
+  // Validate all steps and return first invalid step
+  int? _getFirstInvalidStep() {
+    for (int i = 0; i < _totalSteps; i++) {
+      final currentStepBackup = _currentStep;
+      _currentStep = i;
+      if (!_isCurrentStepValid()) {
+        _currentStep = currentStepBackup;
+        return i;
+      }
+      _currentStep = currentStepBackup;
+    }
+    return null;
+  }
+
   void _nextStep() {
+    if (!_isCurrentStepValid()) {
+      _showValidationError();
+      return;
+    }
+
     if (_currentStep < _totalSteps - 1) {
       setState(() {
         _currentStep++;
@@ -217,7 +285,67 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     }
   }
 
+  void _showValidationError() {
+    String message = '';
+    switch (_currentStep) {
+      case 0:
+        message = 'Please enter a valid weight';
+        break;
+      case 1:
+        message = 'Please enter a valid height';
+        break;
+      case 2:
+        message = 'Please select your birthday';
+        break;
+      case 3:
+        message = 'Please describe any health issues (or enter "None" if none)';
+        break;
+      case 4:
+        message = 'Please describe habits to improve (or enter "None" if none)';
+        break;
+      case 5:
+        message = 'Please select your preferred training environment';
+        break;
+      case 6:
+        message = 'Please select your work shift';
+        break;
+      case 7:
+        message = 'Please select your wake-up time';
+        break;
+      case 8:
+        message = 'Please select your sleep time';
+        break;
+      case 9:
+        message = 'Please describe both your morning and evening routines';
+        break;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _submitQuestionnaire() async {
+    // Validate all steps first
+    final invalidStep = _getFirstInvalidStep();
+    if (invalidStep != null) {
+      // Navigate to first invalid step
+      setState(() {
+        _currentStep = invalidStep;
+      });
+      _pageController.animateToPage(
+        invalidStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _showValidationError();
+      return;
+    }
+
     // Show loading indicator
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -237,15 +365,15 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     try {
       // Create the questionnaire object
       final questionnaire = Questionnaire(
-        weight: double.tryParse(_weightController.text) ?? 0.0,
-        height: double.tryParse(_heightController.text) ?? 0.0,
-        age: int.tryParse(_ageController.text) ?? 0,
-        healthIssues: _healthIssuesController.text,
-        badHabits: _badHabitsController.text,
+        weight: double.parse(_weightController.text),
+        height: double.parse(_heightController.text),
+        birthday: _birthday!, // Send birthday instead of age
+        healthIssues: _healthIssues,
+        badHabits: _badHabits,
         trainingEnvironment: _trainingEnvironment,
         workShift: _workShift,
-        wakeUpTime: _wakeUpTime ?? const TimeOfDay(hour: 7, minute: 0), // Default to 7:00 AM
-        sleepTime: _sleepTime ?? const TimeOfDay(hour: 23, minute: 0),
+        wakeUpTime: _wakeUpTime!,
+        sleepTime: _sleepTime!,
         morningRoutine: _morningRoutineController.text,
         eveningRoutine: _eveningRoutineController.text,
         createdAt: DateTime.now(),
@@ -280,7 +408,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         }
       }
     } catch (e) {
-      
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -296,75 +423,58 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () {
-            // Save draft before leaving
-            _saveDraftData();
-            Navigator.pop(context);
-          },
-        ),
-        title: const Text(
-          'Health Questionnaire',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
+    return WillPopScope(
+      onWillPop: () async {
+        // Prevent back navigation - questionnaire must be completed
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please complete the questionnaire to continue'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
           ),
+        );
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false, // Remove back button
+          title: const Text(
+            'Health Questionnaire',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+              fontSize: 20,
+            ),
+          ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-        actions: [
-          if (_currentStep > 0)
-            TextButton(
-              onPressed: () async {
-                // Save and continue later
-                await _saveDraftData();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Progress saved! You can continue later.'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                  Navigator.pushReplacementNamed(context, '/dashboard');
-                }
-              },
-              child: const Text(
-                'Save & Exit',
-                style: TextStyle(color: Colors.blue),
+        body: Column(
+          children: [
+            _buildProgressBar(),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildWeightStep(),
+                  _buildHeightStep(),
+                  _buildBirthdayStep(),
+                  _buildHealthIssuesStep(),
+                  _buildBadHabitsStep(),
+                  _buildTrainingEnvironmentStep(),
+                  _buildWorkShiftStep(),
+                  _buildWakeUpTimeStep(),
+                  _buildSleepTimeStep(),
+                  _buildRoutinesStep(),
+                ],
               ),
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildProgressBar(),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildWeightStep(),
-                _buildHeightStep(),
-                _buildAgeStep(),
-                _buildHealthIssuesStep(),
-                _buildBadHabitsStep(),
-                _buildTrainingEnvironmentStep(),
-                _buildWorkShiftStep(),
-                _buildWakeUpTimeStep(),
-                _buildSleepTimeStep(),
-                _buildRoutinesStep(),
-              ],
-            ),
-          ),
-          _buildNavigationButtons(),
-        ],
+            _buildNavigationButtons(),
+          ],
+        ),
       ),
     );
   }
@@ -407,58 +517,57 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     );
   }
 
-
-Widget _buildSelectionOptions({
-  required List<String> options,
-  List<String>? displayTexts,
-  required String? selectedValue, // Changed to nullable
-  required Function(String) onChanged,
-}) {
-  final texts = displayTexts ?? options;
-  
-  return Column(
-    children: List.generate(options.length, (index) {
-      final option = options[index];
-      final displayText = texts[index];
-      
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: InkWell(
-          onTap: () => onChanged(option),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: selectedValue == option ? Colors.black : Colors.grey[300]!,
-                width: selectedValue == option ? 2 : 1,
+  Widget _buildSelectionOptions({
+    required List<String> options,
+    List<String>? displayTexts,
+    required String? selectedValue,
+    required Function(String) onChanged,
+  }) {
+    final texts = displayTexts ?? options;
+    
+    return Column(
+      children: List.generate(options.length, (index) {
+        final option = options[index];
+        final displayText = texts[index];
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: InkWell(
+            onTap: () => onChanged(option),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: selectedValue == option ? Colors.black : Colors.grey[300]!,
+                  width: selectedValue == option ? 2 : 1,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                color: selectedValue == option ? Colors.black.withOpacity(0.05) : Colors.white,
               ),
-              borderRadius: BorderRadius.circular(12),
-              color: selectedValue == option ? Colors.black.withOpacity(0.05) : Colors.white,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  selectedValue == option ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                  color: selectedValue == option ? Colors.black : Colors.grey[400],
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  displayText,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: selectedValue == option ? FontWeight.w600 : FontWeight.w400,
-                    color: selectedValue == option ? Colors.black : Colors.grey[700],
+              child: Row(
+                children: [
+                  Icon(
+                    selectedValue == option ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    color: selectedValue == option ? Colors.black : Colors.grey[400],
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Text(
+                    displayText,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: selectedValue == option ? FontWeight.w600 : FontWeight.w400,
+                      color: selectedValue == option ? Colors.black : Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
-    }),
-  );
-}
+        );
+      }),
+    );
+  }
 
   Widget _buildStepContainer({
     required String title,
@@ -518,15 +627,14 @@ Widget _buildSelectionOptions({
     );
   }
 
-  Widget _buildAgeStep() {
+  Widget _buildBirthdayStep() {
     return _buildStepContainer(
-      title: 'Koliko imaš godina?',
+      title: 'Kada si rođen/rođena?',
       subtitle: 'Ovo nam pomaže da personalizujemo tvoj plan treninga',
-      child: _buildNumberInput(
-        controller: _ageController,
-        suffix: 'years',
-        hint: 'Unesi svoje godine',
-        isInteger: true,
+      child: _buildDatePicker(
+        selectedDate: _birthday,
+        onDateSelected: (date) => setState(() => _birthday = date),
+        hint: 'Odaberi datum rođenja',
       ),
     );
   }
@@ -536,8 +644,9 @@ Widget _buildSelectionOptions({
       title: 'Imate li zdravstvenih problema?',
       subtitle: 'Ovo nam pomaže da razumijemo tvoje zdravstveno stanje',
       child: _buildTextAreaInput(
-        controller: _healthIssuesController,
-        hint: 'npr., dijabetes, visoki krvni tlak, povrede...',
+        value: _healthIssues,
+        onChanged: (value) => setState(() => _healthIssues = value),
+        hint: 'npr., dijabetes, visoki krvni tlak, povrede... ili "Nema" ako nema',
       ),
     );
   }
@@ -547,14 +656,14 @@ Widget _buildSelectionOptions({
       title: 'Imaš li kakvih navika za poboljšanje?',
       subtitle: 'Koje navike želiš promjeniti ili poboljšati?',
       child: _buildTextAreaInput(
-        controller: _badHabitsController,
-        hint: 'npr., pušenje, prekomjereno vrijeme provedeno ispred ekrana, neredovito jedenje...',
+        value: _badHabits,
+        onChanged: (value) => setState(() => _badHabits = value),
+        hint: 'npr., pušenje, prekomjerno vrijeme provedeno ispred ekrana, neredovito jedenje... ili "Nema" ako nema',
       ),
     );
   }
 
   Widget _buildTrainingEnvironmentStep() {
-    // Define enum-like values and their display text
     final Map<String, String> trainingOptions = {
       'home': 'Kod kuće',
       'gym': 'Teretana',
@@ -566,8 +675,8 @@ Widget _buildSelectionOptions({
       title: 'Gdje preferiraš trenirati?',
       subtitle: 'Ovo nam pomaže da preporučimo odgovarajuće treninge',
       child: _buildSelectionOptions(
-        options: trainingOptions.keys.toList(), // ['home', 'gym', 'outdoor', 'both']
-        displayTexts: trainingOptions.values.toList(), // ['Kod kuće', 'Teretana', 'Na otvorenom', 'Oboje']
+        options: trainingOptions.keys.toList(),
+        displayTexts: trainingOptions.values.toList(),
         selectedValue: _trainingEnvironment,
         onChanged: (value) => setState(() => _trainingEnvironment = value),
       ),
@@ -575,21 +684,20 @@ Widget _buildSelectionOptions({
   }
 
   Widget _buildWorkShiftStep() {
-    // Define enum-like values and their display text
     final Map<String, String> workShiftOptions = {
-      'morning': 'Morning Shift',
-      'afternoon': 'Afternoon Shift', 
-      'night': 'Night Shift',
-      'split': 'Split Shift',
-      'flexible': 'Flexible',
+      'morning': 'Jutarnja smjena',
+      'afternoon': 'Popodnevna smjena', 
+      'night': 'Noćna smjena',
+      'split': 'Podjeljena smjena',
+      'flexible': 'Fleksibilno',
     };
 
     return _buildStepContainer(
-      title: 'What\'s your work schedule?',
-      subtitle: 'This helps us plan your workout timing',
+      title: 'Kakav je tvoj radni raspored?',
+      subtitle: 'Ovo nam pomaže da planiramo vrijeme za treninge',
       child: _buildSelectionOptions(
-        options: workShiftOptions.keys.toList(), // ['day_shift', 'night_shift', 'flexible', 'part_time']
-        displayTexts: workShiftOptions.values.toList(), // ['Day Shift', 'Night Shift', 'Flexible', 'Part-time']
+        options: workShiftOptions.keys.toList(),
+        displayTexts: workShiftOptions.values.toList(),
         selectedValue: _workShift,
         onChanged: (value) => setState(() => _workShift = value),
       ),
@@ -598,44 +706,46 @@ Widget _buildSelectionOptions({
 
   Widget _buildWakeUpTimeStep() {
     return _buildStepContainer(
-      title: 'When do you wake up?',
-      subtitle: 'This helps us schedule your morning routine',
+      title: 'Kada se budiš?',
+      subtitle: 'Ovo nam pomaže da planiramo tvoju jutarnju rutinu',
       child: _buildTimePicker(
         selectedTime: _wakeUpTime,
         onTimeSelected: (time) => setState(() => _wakeUpTime = time),
-        hint: 'Select your wake-up time',
+        hint: 'Odaberi vrijeme buđenja',
       ),
     );
   }
 
   Widget _buildSleepTimeStep() {
     return _buildStepContainer(
-      title: 'When do you sleep?',
-      subtitle: 'This helps us plan your evening routine',
+      title: 'Kada ideš spavati?',
+      subtitle: 'Ovo nam pomaže da planiramo tvoju večernju rutinu',
       child: _buildTimePicker(
         selectedTime: _sleepTime,
         onTimeSelected: (time) => setState(() => _sleepTime = time),
-        hint: 'Select your bedtime',
+        hint: 'Odaberi vrijeme spavanja',
       ),
     );
   }
 
   Widget _buildRoutinesStep() {
     return _buildStepContainer(
-      title: 'Tell us about your routines',
-      subtitle: 'What does your typical morning and evening look like?',
+      title: 'Opišite vaše rutine',
+      subtitle: 'Kako izgleda tipičan dan - jutro i večer?',
       child: Column(
         children: [
           _buildTextAreaInput(
-            controller: _morningRoutineController,
-            hint: 'Describe your morning routine...',
-            label: 'Morning Routine',
+            value: _morningRoutineController.text,
+            onChanged: (value) => _morningRoutineController.text = value,
+            hint: 'Opišite jutarnju rutinu...',
+            label: 'Jutarnja rutina',
           ),
           const SizedBox(height: 24),
           _buildTextAreaInput(
-            controller: _eveningRoutineController,
-            hint: 'Describe your evening routine...',
-            label: 'Evening Routine',
+            value: _eveningRoutineController.text,
+            onChanged: (value) => _eveningRoutineController.text = value,
+            hint: 'Opišite večernju rutinu...',
+            label: 'Večernja rutina',
           ),
         ],
       ),
@@ -643,37 +753,38 @@ Widget _buildSelectionOptions({
   }
 
   Widget _buildNumberInput({
-      required TextEditingController controller,
-      required String suffix,
-      required String hint,
-      bool isInteger = false,
-    }) {
-      return Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(12),
+    required TextEditingController controller,
+    required String suffix,
+    required String hint,
+    bool isInteger = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.numberWithOptions(decimal: !isInteger),
+        inputFormatters: isInteger 
+          ? [FilteringTextInputFormatter.digitsOnly]
+          : [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+        onChanged: (_) => _saveDraftData(),
+        decoration: InputDecoration(
+          hintText: hint,
+          suffixText: suffix,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(16),
+          suffixStyle: TextStyle(color: Colors.grey[600]),
         ),
-        child: TextField(
-          controller: controller,
-          keyboardType: TextInputType.numberWithOptions(decimal: !isInteger),
-          inputFormatters: isInteger 
-            ? [FilteringTextInputFormatter.digitsOnly]
-            : [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-          onChanged: (_) => _saveDraftData(), // Auto-save on text change
-          decoration: InputDecoration(
-            hintText: hint,
-            suffixText: suffix,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.all(16),
-            suffixStyle: TextStyle(color: Colors.grey[600]),
-          ),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        ),
-      );
-    }
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
 
   Widget _buildTextAreaInput({
-    required TextEditingController controller,
+    required String value,
+    required Function(String) onChanged,
     required String hint,
     String? label,
   }) {
@@ -697,7 +808,7 @@ Widget _buildSelectionOptions({
             borderRadius: BorderRadius.circular(12),
           ),
           child: TextField(
-            controller: controller,
+            onChanged: onChanged,
             maxLines: 4,
             decoration: InputDecoration(
               hintText: hint,
@@ -705,13 +816,80 @@ Widget _buildSelectionOptions({
               contentPadding: const EdgeInsets.all(16),
             ),
             style: const TextStyle(fontSize: 16),
+            controller: TextEditingController(text: value)..selection = TextSelection.fromPosition(TextPosition(offset: value.length)),
           ),
         ),
       ],
     );
   }
 
- 
+  Widget _buildDatePicker({
+    required DateTime? selectedDate,
+    required Function(DateTime) onDateSelected,
+    required String hint,
+  }) {
+    return InkWell(
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: selectedDate ?? DateTime.now().subtract(const Duration(days: 365 * 25)),
+          firstDate: DateTime.now().subtract(const Duration(days: 365 * 100)),
+          lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
+        );
+        if (date != null) {
+          onDateSelected(date);
+          _saveDraftData();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today, color: Colors.grey[600]),
+            const SizedBox(width: 12),
+            Text(
+              selectedDate != null 
+                ? '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'
+                : hint,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: selectedDate != null ? Colors.black : Colors.grey[500],
+              ),
+            ),
+            if (selectedDate != null) ...[
+              const Spacer(),
+              Text(
+                '${_calculatedAge} godina',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method for 24-hour time picker
+  Future<TimeOfDay?> _pickTime(BuildContext context, TimeOfDay initialTime) {
+    return showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+  }
 
   Widget _buildTimePicker({
     required TimeOfDay? selectedTime,
@@ -720,12 +898,11 @@ Widget _buildSelectionOptions({
   }) {
     return InkWell(
       onTap: () async {
-        final time = await showTimePicker(
-          context: context,
-          initialTime: selectedTime ?? TimeOfDay.now(),
-        );
-        if (time != null) {
-          onTimeSelected(time);
+        final now = TimeOfDay.now();
+        final picked = await _pickTime(context, selectedTime ?? now);
+        if (picked != null) {
+          onTimeSelected(picked);
+          _saveDraftData();
         }
       },
       child: Container(
@@ -740,7 +917,7 @@ Widget _buildSelectionOptions({
             const SizedBox(width: 12),
             Text(
               selectedTime != null 
-                ? selectedTime.format(context)
+                ? _format24Hour(selectedTime) // Use 24-hour format display
                 : hint,
               style: TextStyle(
                 fontSize: 18,
@@ -754,7 +931,13 @@ Widget _buildSelectionOptions({
     );
   }
 
+  // Helper method to format time in 24-hour format
+  String _format24Hour(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildNavigationButtons() {
+    final isValid = _isCurrentStepValid();
     return Container(
       padding: const EdgeInsets.all(24),
       child: Row(
@@ -771,7 +954,7 @@ Widget _buildSelectionOptions({
                   side: const BorderSide(color: Colors.black),
                 ),
                 child: const Text(
-                  'Previous',
+                  'Nazad',
                   style: TextStyle(
                     color: Colors.black,
                     fontSize: 16,
@@ -787,7 +970,8 @@ Widget _buildSelectionOptions({
                 ? _submitQuestionnaire 
                 : _nextStep,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
+                backgroundColor: Colors.black, // Always black
+                disabledBackgroundColor: Colors.grey[400], // Gray when disabled
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -795,9 +979,9 @@ Widget _buildSelectionOptions({
                 elevation: 0,
               ),
               child: Text(
-                _currentStep == _totalSteps - 1 ? 'Complete' : 'Next',
-                style: const TextStyle(
-                  color: Colors.white,
+                _currentStep == _totalSteps - 1 ? 'Završi' : 'Sljedeće',
+                style: TextStyle(
+                  color: isValid ? Colors.white : Colors.grey[300],
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
