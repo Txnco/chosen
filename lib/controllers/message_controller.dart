@@ -1,3 +1,4 @@
+// lib/controllers/message_controller.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,158 +8,147 @@ import 'package:chosen/models/message.dart';
 class MessageController {
   static const _storage = FlutterSecureStorage();
   
-  /// Get all conversations for current user (admin sees all, client sees only trainer)
+  /// Get all threads for current user
+  /// Backend API: GET /chat/threads
   static Future<List<Conversation>> getConversations() async {
     try {
-      final response = await ChosenApi.get('/conversations/');
+      final response = await ChosenApi.get('/chat/threads');
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
-        return data.map((json) => Conversation.fromJson(json)).toList();
+        List<Conversation> conversations = [];
+        
+        for (var json in data) {
+          // Map backend response to frontend Conversation model
+          final conversation = Conversation.fromJson({
+            'id': json['id'],
+            'trainer_id': json['trainer_id'],
+            'client_id': json['client_id'],
+            'last_message_id': null,
+            'last_message_at': json['last_message_at'],
+            'created_at': json['created_at'],
+            'updated_at': json['updated_at'],
+            // Handle both client and trainer views
+            'client_name': json['client_name'], // For trainer view
+            'trainer_name': json['trainer_name'], // For client view
+            'client_avatar': null,
+            'last_message_text': json['last_message'], // ✅ Fixed: backend sends 'last_message'
+            'has_unread_messages': json['has_unread_messages'] ?? false,
+            'unread_count': json['unread_count'] ?? 0,
+          });
+          
+          conversations.add(conversation);
+        }
+        
+        return conversations;
       } else {
+        print('Failed to get conversations: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
+      print('Error getting conversations: $e');
       return [];
     }
   }
   
-  /// Get messages for a specific conversation
-  static Future<List<Message>> getMessages(int conversationId, {int page = 1, int limit = 50}) async {
+  /// Send a message 
+  /// Backend API: POST /chat/message
+  static Future<Message?> sendMessage(int threadId, String body) async {
     try {
-      final response = await ChosenApi.get('/conversations/$conversationId/messages?page=$page&limit=$limit');
+      final response = await ChosenApi.post('/chat/message', {
+        'thread_id': threadId,
+        'body': body,
+      });
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        
+        // ✅ Fixed: Map backend fields to frontend Message model
+        return Message.fromJson({
+          'id': responseData['id'],
+          'conversation_id': responseData['thread_id'], // ✅ backend: thread_id -> frontend: conversation_id
+          'sender_id': responseData['user_id'],         // ✅ backend: user_id -> frontend: sender_id
+          'message_type': responseData['image_url'] != null ? 'image' : 'text',
+          'content': responseData['body'],              // ✅ backend: body -> frontend: content
+          'file_url': responseData['image_url'],
+          'file_name': null,
+          'file_size': null,
+          'is_read': responseData['read_at'] != null,   // ✅ backend: read_at -> frontend: is_read
+          'read_at': responseData['read_at'],
+          'created_at': responseData['created_at'],
+          'updated_at': responseData['updated_at'],
+        });
+      } else {
+        print('Failed to send message: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+      return null;
+    }
+  }
+  
+  /// Get messages for a conversation
+  /// Backend API: GET /chat/threads/{thread_id}/messages
+  static Future<List<Message>> getMessages(int threadId, {int page = 1, int limit = 50}) async {
+    try {
+      final response = await ChosenApi.get('/chat/threads/$threadId/messages?page=$page&limit=$limit');
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final messages = data['messages'] as List;
-        return messages.map((json) => Message.fromJson(json)).toList();
+        final messages = data['messages'] as List? ?? [];
+        
+        print('📨 Raw backend response: $data'); // Debug log
+        
+        return messages.map((json) {
+          print('📨 Processing message: $json'); // Debug log
+          
+          // ✅ Fixed: Map backend fields to frontend Message model correctly
+          return Message.fromJson({
+            'id': json['id'],
+            'conversation_id': json['thread_id'],     // ✅ backend: thread_id -> frontend: conversation_id
+            'sender_id': json['user_id'],             // ✅ backend: user_id -> frontend: sender_id
+            'message_type': json['image_url'] != null && json['image_url'].toString().isNotEmpty ? 'image' : 'text',
+            'content': json['body'],                  // ✅ backend: body -> frontend: content
+            'file_url': json['image_url'],
+            'file_name': null,
+            'file_size': null,
+            'is_read': json['read_at'] != null,       // ✅ backend: read_at -> frontend: is_read
+            'read_at': json['read_at'],
+            'created_at': json['created_at'],
+            'updated_at': json['updated_at'],
+          });
+        }).toList();
       } else {
+        print('Failed to get messages: ${response.statusCode} - ${response.body}');
         return [];
       }
     } catch (e) {
+      print('Error getting messages: $e');
       return [];
-    }
-  }
-  
-  /// Send a text message
-  static Future<Message?> sendTextMessage(int conversationId, String content) async {
-    try {
-      final messageData = {
-        'conversation_id': conversationId,
-        'message_type': 'text',
-        'content': content,
-      };
-      
-      final response = await ChosenApi.post('/messages/', messageData);
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        return Message.fromJson(responseData);
-      } else {
-        return null;
-      }
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  /// Send an image message
-  static Future<Message?> sendImageMessage(int conversationId, File imageFile, {String? caption}) async {
-    try {
-      // First upload the image file
-      final uploadResponse = await _uploadFile(imageFile, 'image');
-      if (uploadResponse == null) return null;
-      
-      final messageData = {
-        'conversation_id': conversationId,
-        'message_type': 'image',
-        'content': caption,
-        'file_url': uploadResponse['file_url'],
-        'file_name': uploadResponse['file_name'],
-        'file_size': uploadResponse['file_size'],
-      };
-      
-      final response = await ChosenApi.post('/messages/', messageData);
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        return Message.fromJson(responseData);
-      } else {
-        return null;
-      }
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  /// Send an audio message
-  static Future<Message?> sendAudioMessage(int conversationId, File audioFile) async {
-    try {
-      // First upload the audio file
-      final uploadResponse = await _uploadFile(audioFile, 'audio');
-      if (uploadResponse == null) return null;
-      
-      final messageData = {
-        'conversation_id': conversationId,
-        'message_type': 'audio',
-        'file_url': uploadResponse['file_url'],
-        'file_name': uploadResponse['file_name'],
-        'file_size': uploadResponse['file_size'],
-      };
-      
-      final response = await ChosenApi.post('/messages/', messageData);
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        return Message.fromJson(responseData);
-      } else {
-        return null;
-      }
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  /// Upload file to server
-  static Future<Map<String, dynamic>?> _uploadFile(File file, String fileType) async {
-    try {
-      // This would typically use multipart/form-data
-      // For now, we'll simulate the response
-      // In real implementation, you'd use http.MultipartRequest or dio package
-      
-      final fileName = file.path.split('/').last;
-      final fileSize = await file.length();
-      
-      // Simulate upload response
-      final uploadResponse = {
-        'file_url': 'https://example.com/uploads/$fileName',
-        'file_name': fileName,
-        'file_size': fileSize,
-      };
-      
-      return uploadResponse;
-    } catch (e) {
-      return null;
     }
   }
   
   /// Mark messages as read
-  static Future<bool> markMessagesAsRead(int conversationId, List<int> messageIds) async {
+  /// Backend API: POST /chat/threads/{thread_id}/mark-read
+  static Future<bool> markMessagesAsRead(int threadId, List<int> messageIds) async {
     try {
-      final response = await ChosenApi.post('/conversations/$conversationId/mark-read', {
+      final response = await ChosenApi.post('/chat/threads/$threadId/mark-read', {
         'message_ids': messageIds,
       });
       
       return response.statusCode == 200;
     } catch (e) {
+      print('Error marking messages as read: $e');
       return false;
     }
   }
   
-  /// Get unread messages count
+  /// Get total unread count
+  /// Backend API: GET /chat/unread-count
   static Future<int> getUnreadCount() async {
     try {
-      final response = await ChosenApi.get('/conversations/unread-count');
+      final response = await ChosenApi.get('/chat/unread-count');
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -166,81 +156,48 @@ class MessageController {
       }
       return 0;
     } catch (e) {
+      print('Error getting unread count: $e');
       return 0;
     }
   }
   
-  /// Create or get conversation with a client (admin only)
-  static Future<Conversation?> createOrGetConversation(int clientId) async {
+  /// Send an image message (placeholder - needs file upload implementation)
+  static Future<Message?> sendImageMessage(int threadId, File imageFile, {String? caption}) async {
     try {
-      final response = await ChosenApi.post('/conversations/create-or-get', {
-        'client_id': clientId,
-      });
+      // First upload the file
+      final uploadResponse = await _uploadFile(imageFile);
+      if (uploadResponse == null) return null;
       
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        return Conversation.fromJson(responseData);
-      } else {
-        return null;
-      }
+      // Then send message with image URL
+      // Note: Backend doesn't support image URLs in messages yet
+      // This is a placeholder implementation
+      return await sendMessage(threadId, caption ?? '[Image]');
     } catch (e) {
+      print('Error sending image message: $e');
       return null;
     }
   }
   
-  /// Delete a conversation (admin only)
-  static Future<bool> deleteConversation(int conversationId) async {
+  /// Upload file to server
+  /// Backend API: POST /chat/upload
+  static Future<Map<String, dynamic>?> _uploadFile(File file) async {
     try {
-      final response = await ChosenApi.delete('/conversations/$conversationId');
-      return response.statusCode == 200 || response.statusCode == 204;
-    } catch (e) {
-      return false;
-    }
-  }
-  
-  /// Clear all messages in a conversation
-  static Future<bool> clearConversation(int conversationId) async {
-    try {
-      final response = await ChosenApi.delete('/conversations/$conversationId/messages');
-      return response.statusCode == 200 || response.statusCode == 204;
-    } catch (e) {
-      return false;
-    }
-  }
-  
-  /// Search messages
-  static Future<List<Message>> searchMessages(String query, {int? conversationId}) async {
-    try {
-      final endpoint = conversationId != null 
-        ? '/conversations/$conversationId/search?q=$query'
-        : '/messages/search?q=$query';
-        
-      final response = await ChosenApi.get(endpoint);
+      // This would need proper multipart form data implementation
+      // For now, this is a placeholder
       
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        return data.map((json) => Message.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-  
-  /// Get online status of users (for real-time features)
-  static Future<Map<int, bool>> getUsersOnlineStatus(List<int> userIds) async {
-    try {
-      final response = await ChosenApi.post('/users/online-status', {
-        'user_ids': userIds,
-      });
+      // You'll need to implement multipart upload using packages like:
+      // - dio (for easier file uploads)
+      // - http with MultipartRequest
       
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return data.map((key, value) => MapEntry(int.parse(key), value as bool));
-      }
-      return {};
+      // Placeholder response
+      return {
+        'file_url': 'https://example.com/uploads/placeholder.jpg',
+        'file_name': file.path.split('/').last,
+        'file_size': await file.length(),
+      };
     } catch (e) {
-      return {};
+      print('Error uploading file: $e');
+      return null;
     }
   }
   
@@ -253,6 +210,7 @@ class MessageController {
         value: jsonEncode(conversationsJson),
       );
     } catch (e) {
+      print('Error caching conversations: $e');
     }
   }
   
@@ -266,6 +224,7 @@ class MessageController {
       }
       return [];
     } catch (e) {
+      print('Error getting cached conversations: $e');
       return [];
     }
   }
@@ -275,6 +234,7 @@ class MessageController {
     try {
       await _storage.delete(key: 'cached_conversations');
     } catch (e) {
+      print('Error clearing cache: $e');
     }
   }
 }

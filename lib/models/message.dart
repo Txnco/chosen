@@ -1,3 +1,4 @@
+// lib/models/message.dart
 
 enum MessageType { text, image, audio }
 
@@ -66,7 +67,6 @@ class Message {
   };
 }
 
-// lib/models/conversation.dart
 class Conversation {
   final int? id;
   final int trainerId;
@@ -77,7 +77,8 @@ class Conversation {
   final DateTime updatedAt;
   
   // Additional fields for UI
-  final String? clientName;
+  final String? clientName;      // For trainer view
+  final String? trainerName;     // For client view
   final String? clientAvatar;
   final String? lastMessageText;
   final bool hasUnreadMessages;
@@ -92,6 +93,7 @@ class Conversation {
     required this.createdAt,
     required this.updatedAt,
     this.clientName,
+    this.trainerName,
     this.clientAvatar,
     this.lastMessageText,
     this.hasUnreadMessages = false,
@@ -110,6 +112,7 @@ class Conversation {
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       clientName: json['client_name'],
+      trainerName: json['trainer_name'],
       clientAvatar: json['client_avatar'],
       lastMessageText: json['last_message_text'],
       hasUnreadMessages: json['has_unread_messages'] ?? false,
@@ -126,4 +129,60 @@ class Conversation {
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
+
+  // Helper method to get display name based on current user role
+  String getDisplayName(int? currentUserId) {
+    if (currentUserId == null) return 'Unknown';
+    
+    if (currentUserId == trainerId) {
+      // Current user is trainer, show client name
+      return clientName ?? 'Client #$clientId';
+    } else if (currentUserId == clientId) {
+      // Current user is client, show trainer name  
+      return trainerName ?? 'Trainer';
+    } else {
+      // Fallback
+      return 'Unknown User';
+    }
+  }
+
+  // Helper method to get initials for avatar
+  String getInitials(int? currentUserId) {
+    final displayName = getDisplayName(currentUserId);
+    final words = displayName.split(' ');
+    
+    if (words.length >= 2) {
+      return '${words[0][0]}${words[1][0]}'.toUpperCase();
+    } else if (words.isNotEmpty && words[0].isNotEmpty) {
+      return words[0][0].toUpperCase();
+    } else {
+      return 'U';
+    }
+  }
+
+  // Helper method to create a copy with additional UI data
+  Conversation copyWithUIData({
+    String? clientName,
+    String? trainerName,
+    String? clientAvatar,
+    String? lastMessageText,
+    bool? hasUnreadMessages,
+    int? unreadCount,
+  }) {
+    return Conversation(
+      id: id,
+      trainerId: trainerId,
+      clientId: clientId,
+      lastMessageId: lastMessageId,
+      lastMessageAt: lastMessageAt,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      clientName: clientName ?? this.clientName,
+      trainerName: trainerName ?? this.trainerName,
+      clientAvatar: clientAvatar ?? this.clientAvatar,
+      lastMessageText: lastMessageText ?? this.lastMessageText,
+      hasUnreadMessages: hasUnreadMessages ?? this.hasUnreadMessages,
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
+  }
 }

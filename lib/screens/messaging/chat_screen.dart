@@ -1,6 +1,8 @@
 // lib/screens/messaging/chat_screen.dart
 import 'package:flutter/material.dart';
 import 'package:chosen/models/message.dart';
+import 'package:chosen/controllers/message_controller.dart';
+import 'package:chosen/controllers/user_controller.dart';
 
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
@@ -16,88 +18,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = true;
   bool _isSending = false;
-
-  // Dummy current user ID (trainer) - will come from auth
-  final int _currentUserId = 1;
-
-  // Dummy messages data
-  final List<Message> _messages = [
-    Message(
-      id: 1,
-      conversationId: 1,
-      senderId: 2,
-      messageType: MessageType.text,
-      content: 'Zdravo treneru! Imam pitanje o dijeti.',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-      isRead: true,
-    ),
-    Message(
-      id: 2,
-      conversationId: 1,
-      senderId: 1,
-      messageType: MessageType.text,
-      content: 'Zdravo! Naravno, pitaj slobodno. Tu sam da pomognem.',
-      createdAt: DateTime.now().subtract(const Duration(days: 2, hours: -1)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 2, hours: -1)),
-      isRead: true,
-    ),
-    Message(
-      id: 3,
-      conversationId: 1,
-      senderId: 2,
-      messageType: MessageType.text,
-      content: 'Koliko proteina dnevno trebam da unosim? Trenutno vagam 75kg.',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-      isRead: true,
-    ),
-    Message(
-      id: 4,
-      conversationId: 1,
-      senderId: 1,
-      messageType: MessageType.text,
-      content: 'Za tvoju težinu preporučujem 1.6-2.2g proteina po kilogramu. Dakle, između 120-165g dnevno. Fokusiraj se na kvalitetne izvore kao što su piletina, riba, jaja i mahune.',
-      createdAt: DateTime.now().subtract(const Duration(days: 1, hours: -2)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1, hours: -2)),
-      isRead: true,
-    ),
-    Message(
-      id: 5,
-      conversationId: 1,
-      senderId: 2,
-      messageType: MessageType.text,
-      content: 'Hvala ti puno! A što se tiče suplementacije?',
-      createdAt: DateTime.now().subtract(const Duration(hours: 4)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 4)),
-      isRead: true,
-    ),
-    Message(
-      id: 6,
-      conversationId: 1,
-      senderId: 1,
-      messageType: MessageType.text,
-      content: 'Whey protein nakon treninga je dobar izbor. Kreatin monohydrat također može pomoći s performansama. Ali osnova je uvijek prava hrana! 💪',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
-      isRead: true,
-    ),
-    Message(
-      id: 7,
-      conversationId: 1,
-      senderId: 2,
-      messageType: MessageType.text,
-      content: 'Hvala za savjete o ishrani! 💪',
-      createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
-      updatedAt: DateTime.now().subtract(const Duration(minutes: 5)),
-      isRead: false,
-    ),
-  ];
+  List<Message> _messages = [];
+  int? _currentUserId;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _initializeChat();
   }
 
   @override
@@ -107,13 +35,75 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _scrollToBottom();
+  // ✅ Fixed race condition - sequential execution
+  Future<void> _initializeChat() async {
+    try {
+      // First, get current user and wait for it to complete
+      await _getCurrentUser();
+      
+      // Only then load messages
+      await _loadMessages();
+    } catch (e) {
+      print('Error initializing chat: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to initialize chat. Please try again.';
+        });
+      }
     }
+  }
+
+  Future<void> _getCurrentUser() async {
+    try {
+      final userController = UserController();
+      final user = await userController.getStoredUser();
+      if (user != null && mounted) {
+        setState(() {
+          _currentUserId = user.id;
+        });
+        print('✅ Current user loaded: ${user.id}'); // Debug log
+      } else {
+        print('❌ No user found in storage');
+      }
+    } catch (e) {
+      print('Error getting current user: $e');
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      print('📨 Loading messages for thread ${widget.conversation.id}...'); // Debug log
+      final messages = await MessageController.getMessages(widget.conversation.id!);
+      print('📨 Loaded ${messages.length} messages'); // Debug log
+      
+      if (mounted) {
+        setState(() {
+          _messages = messages;
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      print('Error loading messages: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load messages. Pull down to retry.';
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshMessages() async {
+    await _loadMessages();
   }
 
   void _scrollToBottom() {
@@ -130,31 +120,54 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final messageText = _messageController.text.trim();
-    if (messageText.isEmpty || _isSending) return;
+    if (messageText.isEmpty || _isSending || widget.conversation.id == null) return;
 
     setState(() => _isSending = true);
+    
+    // Clear input immediately for better UX
+    final originalText = messageText;
     _messageController.clear();
 
-    final newMessage = Message(
-      conversationId: widget.conversation.id!,
-      senderId: _currentUserId,
-      messageType: MessageType.text,
-      content: messageText,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    try {
+      final sentMessage = await MessageController.sendMessage(
+        widget.conversation.id!,
+        originalText,
+      );
 
-    setState(() {
-      _messages.add(newMessage);
-    });
-
-    _scrollToBottom();
-
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    if (mounted) {
-      setState(() => _isSending = false);
+      if (sentMessage != null && mounted) {
+        setState(() {
+          _messages.add(sentMessage);
+        });
+        _scrollToBottom();
+      } else {
+        // Restore text if send failed
+        if (mounted) {
+          _messageController.text = originalText;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to send message. Please try again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+      if (mounted) {
+        _messageController.text = originalText;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending message: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
   }
 
@@ -181,7 +194,7 @@ class _ChatScreenState extends State<ChatScreen> {
         elevation: 1,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, true),
         ),
         title: Row(
           children: [
@@ -192,7 +205,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.conversation.clientName ?? 'Client',
+                    widget.conversation.getDisplayName(_currentUserId),
                     style: const TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
@@ -200,7 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   Text(
-                    'Online', // This would come from real-time status
+                    'Online',
                     style: TextStyle(
                       color: Colors.green[600],
                       fontSize: 12,
@@ -214,55 +227,63 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: Colors.black),
-            onPressed: () {
-              // TODO: Video call feature
-            },
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: _refreshMessages,
           ),
-          IconButton(
-            icon: const Icon(Icons.call_outlined, color: Colors.black),
-            onPressed: () {
-              // TODO: Voice call feature
-            },
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.black),
-            onSelected: (value) {
-              // Handle menu selections
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'clear',
-                child: Row(
-                  children: [
-                    Icon(Icons.clear_all, size: 18),
-                    SizedBox(width: 12),
-                    Text('Clear Chat'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'block',
-                child: Row(
-                  children: [
-                    Icon(Icons.block, size: 18, color: Colors.red),
-                    SizedBox(width: 12),
-                    Text('Block User', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          // ✅ Removed clear chat menu - just keeping refresh
         ],
       ),
       body: Column(
         children: [
+          if (_error != null) _buildErrorBanner(),
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator(color: Colors.black))
-              : _buildMessagesList(),
+              : RefreshIndicator(
+                  onRefresh: _refreshMessages,
+                  color: Colors.black,
+                  child: _buildMessagesList(),
+                ),
           ),
           _buildMessageInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.red[100],
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red[800], size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _error!,
+              style: TextStyle(
+                color: Colors.red[800],
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => _error = null);
+              _refreshMessages();
+            },
+            child: Text(
+              'Retry',
+              style: TextStyle(
+                color: Colors.red[800],
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -290,8 +311,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildDefaultSmallAvatar() {
-    final name = widget.conversation.clientName ?? 'Client';
-    final initials = name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase();
+    final initials = widget.conversation.getInitials(_currentUserId);
     
     return Center(
       child: Text(
@@ -306,46 +326,23 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessagesList() {
+    print('🔍 Building messages list: ${_messages.length} messages, currentUserId: $_currentUserId'); // Debug log
+    
     if (_messages.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Počnite razgovor',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Pošaljite prvu poruku ${widget.conversation.clientName}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptyState();
     }
 
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
         final isMe = message.senderId == _currentUserId;
         final showDateSeparator = _shouldShowDateSeparator(index);
+        
+        print('💬 Message ${index}: senderId=${message.senderId}, isMe=$isMe, content="${message.content}"'); // Debug log
         
         return Column(
           children: [
@@ -354,6 +351,38 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Počnite razgovor',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Pošaljite prvu poruku ${widget.conversation.getDisplayName(_currentUserId)}',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -422,7 +451,7 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            _buildSmallAvatar(),
+            _buildOtherUserAvatar(),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -490,27 +519,80 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (isMe) ...[
             const SizedBox(width: 8),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: const Center(
-                child: Text(
-                  'T',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
+            _buildCurrentUserAvatar(),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildOtherUserAvatar() {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Center(
+        child: Text(
+          widget.conversation.getInitials(_currentUserId),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentUserAvatar() {
+    String initials = 'U';
+    if (_currentUserId == widget.conversation.trainerId) {
+      final trainerName = widget.conversation.trainerName;
+      if (trainerName != null) {
+        final words = trainerName.split(' ');
+        if (words.length >= 2) {
+          initials = '${words[0][0]}${words[1][0]}'.toUpperCase();
+        } else if (words.isNotEmpty) {
+          initials = words[0][0].toUpperCase();
+        }
+      } else {
+        initials = 'T';
+      }
+    } else if (_currentUserId == widget.conversation.clientId) {
+      final clientName = widget.conversation.clientName;
+      if (clientName != null) {
+        final words = clientName.split(' ');
+        if (words.length >= 2) {
+          initials = '${words[0][0]}${words[1][0]}'.toUpperCase();
+        } else if (words.isNotEmpty) {
+          initials = words[0][0].toUpperCase();
+        }
+      } else {
+        initials = 'C';
+      }
+    }
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.black,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -526,9 +608,20 @@ class _ChatScreenState extends State<ChatScreen> {
             color: Colors.grey[200],
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Center(
-            child: Icon(Icons.image, size: 48, color: Colors.grey),
-          ),
+          child: message.fileUrl != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  message.fileUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Icon(Icons.broken_image, size: 48, color: Colors.grey[600]),
+                  ),
+                ),
+              )
+            : const Center(
+                child: Icon(Icons.image, size: 48, color: Colors.grey),
+              ),
         ),
         if (message.content?.isNotEmpty == true) ...[
           const SizedBox(height: 8),
@@ -569,7 +662,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '0:32',
+                  message.fileName ?? 'Audio',
                   style: TextStyle(
                     color: isMe ? Colors.white70 : Colors.grey[600],
                     fontSize: 12,
@@ -620,6 +713,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                   onSubmitted: (_) => _sendMessage(),
+                  enabled: !_isSending,
                 ),
               ),
             ),
@@ -687,7 +781,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Colors.blue,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Open camera
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Camera feature coming soon!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
                   },
                 ),
                 _buildAttachmentOption(
@@ -696,7 +795,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Colors.green,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Open gallery
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Gallery feature coming soon!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
                   },
                 ),
                 _buildAttachmentOption(
@@ -705,7 +809,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Colors.orange,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Record audio
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Audio recording coming soon!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
                   },
                 ),
               ],

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:chosen/models/message.dart';
 import 'package:chosen/screens/messaging/chat_screen.dart';
+import 'package:chosen/controllers/message_controller.dart';
+import 'package:chosen/controllers/user_controller.dart';
 
 class MessagingScreen extends StatefulWidget {
   const MessagingScreen({super.key});
@@ -14,71 +16,14 @@ class _MessagingScreenState extends State<MessagingScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isLoading = true;
-  
-  // Dummy data - will be replaced with API calls
-  final List<Conversation> _conversations = [
-    Conversation(
-      id: 1,
-      trainerId: 1,
-      clientId: 2,
-      lastMessageId: 10,
-      lastMessageAt: DateTime.now().subtract(const Duration(minutes: 5)),
-      createdAt: DateTime.now().subtract(const Duration(days: 7)),
-      updatedAt: DateTime.now().subtract(const Duration(minutes: 5)),
-      clientName: 'Marko Petrović',
-      clientAvatar: null,
-      lastMessageText: 'Hvala za savjete o ishrani! 💪',
-      hasUnreadMessages: true,
-      unreadCount: 3,
-    ),
-    Conversation(
-      id: 2,
-      trainerId: 1,
-      clientId: 3,
-      lastMessageId: 15,
-      lastMessageAt: DateTime.now().subtract(const Duration(hours: 2)),
-      createdAt: DateTime.now().subtract(const Duration(days: 14)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-      clientName: 'Ana Stojanović',
-      clientAvatar: null,
-      lastMessageText: 'Kada je sledeći trening?',
-      hasUnreadMessages: false,
-      unreadCount: 0,
-    ),
-    Conversation(
-      id: 3,
-      trainerId: 1,
-      clientId: 4,
-      lastMessageId: 8,
-      lastMessageAt: DateTime.now().subtract(const Duration(days: 1)),
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-      clientName: 'Stefan Nikolić',
-      clientAvatar: null,
-      lastMessageText: 'Odličan plan treninga! 🔥',
-      hasUnreadMessages: true,
-      unreadCount: 1,
-    ),
-    Conversation(
-      id: 4,
-      trainerId: 1,
-      clientId: 5,
-      lastMessageId: 22,
-      lastMessageAt: DateTime.now().subtract(const Duration(days: 3)),
-      createdAt: DateTime.now().subtract(const Duration(days: 45)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 3)),
-      clientName: 'Milica Jovanović',
-      clientAvatar: null,
-      lastMessageText: 'Vidimo se sutra u 10h',
-      hasUnreadMessages: false,
-      unreadCount: 0,
-    ),
-  ];
+  List<Conversation> _conversations = [];
+  String? _error;
+  int? _currentUserId; // ✅ Added this
 
   @override
   void initState() {
     super.initState();
-    _loadConversations();
+    _initializeMessaging(); // ✅ Changed this
   }
 
   @override
@@ -87,18 +32,78 @@ class _MessagingScreenState extends State<MessagingScreen> {
     super.dispose();
   }
 
-  Future<void> _loadConversations() async {
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      setState(() => _isLoading = false);
+  // ✅ Added this method
+  Future<void> _initializeMessaging() async {
+    await _getCurrentUser();
+    await _loadConversations();
+  }
+
+  // ✅ Added this method
+  Future<void> _getCurrentUser() async {
+    try {
+      final userController = UserController();
+      final user = await userController.getStoredUser();
+      if (user != null) {
+        setState(() {
+          _currentUserId = user.id;
+        });
+      }
+    } catch (e) {
+      print('Error getting current user: $e');
     }
+  }
+
+  Future<void> _loadConversations() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final conversations = await MessageController.getConversations();
+      
+      if (mounted) {
+        setState(() {
+          _conversations = conversations;
+          _isLoading = false;
+        });
+      }
+      
+      // Cache conversations for offline access
+      await MessageController.cacheConversations(conversations);
+    } catch (e) {
+      print('Error loading conversations: $e');
+      
+      // Try to load from cache if API fails
+      try {
+        final cachedConversations = await MessageController.getCachedConversations();
+        if (mounted) {
+          setState(() {
+            _conversations = cachedConversations;
+            _isLoading = false;
+            _error = 'Using offline data. Pull to refresh.';
+          });
+        }
+      } catch (cacheError) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = 'Failed to load conversations. Please try again.';
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _refreshConversations() async {
+    await _loadConversations();
   }
 
   List<Conversation> get _filteredConversations {
     if (_searchQuery.isEmpty) return _conversations;
     return _conversations.where((conversation) =>
-      conversation.clientName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false
+      // ✅ Fixed this - use role-based display name
+      conversation.getDisplayName(_currentUserId).toLowerCase().contains(_searchQuery.toLowerCase())
     ).toList();
   }
 
@@ -141,20 +146,61 @@ class _MessagingScreenState extends State<MessagingScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_comment_outlined, color: Colors.black),
-            onPressed: () {
-              // TODO: Show new chat dialog or navigate to client selection
-            },
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: _refreshConversations,
           ),
         ],
       ),
       body: Column(
         children: [
+          if (_error != null) _buildErrorBanner(),
           _buildSearchBar(),
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator(color: Colors.black))
-              : _buildConversationsList(),
+              : RefreshIndicator(
+                  onRefresh: _refreshConversations,
+                  color: Colors.black,
+                  child: _buildConversationsList(),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.orange[100],
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber, color: Colors.orange[800], size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _error!,
+              style: TextStyle(
+                color: Colors.orange[800],
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => _error = null);
+              _refreshConversations();
+            },
+            child: Text(
+              'Retry',
+              style: TextStyle(
+                color: Colors.orange[800],
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -168,7 +214,10 @@ class _MessagingScreenState extends State<MessagingScreen> {
         controller: _searchController,
         onChanged: (value) => setState(() => _searchQuery = value),
         decoration: InputDecoration(
-          hintText: 'Pretražite klijente...',
+          // ✅ Fixed hint text
+          hintText: _currentUserId != null && _conversations.isNotEmpty && _currentUserId == _conversations.first.trainerId 
+            ? 'Pretražite klijente...' 
+            : 'Pretražite...',
           prefixIcon: const Icon(Icons.search, color: Colors.grey),
           suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
@@ -202,49 +251,72 @@ class _MessagingScreenState extends State<MessagingScreen> {
   Widget _buildConversationsList() {
     final conversations = _filteredConversations;
     
-    if (conversations.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _searchQuery.isNotEmpty ? Icons.search_off : Icons.chat_bubble_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _searchQuery.isNotEmpty 
-                ? 'Nema rezultata pretrage' 
-                : 'Nema poruka',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            if (_searchQuery.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Pokušajte sa drugim terminom',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
-          ],
-        ),
-      );
+    if (conversations.isEmpty && !_isLoading) {
+      return _buildEmptyState();
     }
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 24),
+      physics: const AlwaysScrollableScrollPhysics(), // For pull-to-refresh
       itemCount: conversations.length,
       itemBuilder: (context, index) {
         final conversation = conversations[index];
         return _buildConversationTile(conversation);
       },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _searchQuery.isNotEmpty ? Icons.search_off : Icons.chat_bubble_outline,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _searchQuery.isNotEmpty 
+              ? 'Nema rezultata pretrage' 
+              : 'Nema poruka',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _searchQuery.isNotEmpty
+              ? 'Pokušajte sa drugim terminom'
+              : 'Kada pošaljete poruku, pojaviće se ovdje',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+          if (_searchQuery.isEmpty) ...[
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _refreshConversations,
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text(
+                'Osvježi',
+                style: TextStyle(color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -264,13 +336,19 @@ class _MessagingScreenState extends State<MessagingScreen> {
         ],
       ),
       child: ListTile(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          // Navigate to chat screen
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(conversation: conversation),
             ),
           );
+          
+          // Refresh conversations when returning from chat (in case of new messages)
+          if (result == true || result == null) {
+            _refreshConversations();
+          }
         },
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         leading: _buildAvatar(conversation),
@@ -278,7 +356,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
           children: [
             Expanded(
               child: Text(
-                conversation.clientName ?? 'Unknown Client',
+                // ✅ Fixed this - use role-based display name
+                conversation.getDisplayName(_currentUserId),
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
@@ -310,7 +389,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
           children: [
             const SizedBox(height: 6),
             Text(
-              conversation.lastMessageText ?? '',
+              conversation.lastMessageText ?? 'No messages yet',
               style: TextStyle(
                 fontSize: 14,
                 color: conversation.hasUnreadMessages 
@@ -325,7 +404,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              _formatTime(conversation.lastMessageAt),
+              _formatTime(conversation.lastMessageAt ?? conversation.updatedAt),
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[500],
@@ -369,8 +448,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildDefaultAvatar(Conversation conversation) {
-    final name = conversation.clientName ?? 'Client';
-    final initials = name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase();
+    // ✅ Fixed this - use role-based initials
+    final initials = conversation.getInitials(_currentUserId);
     
     return Center(
       child: Text(
