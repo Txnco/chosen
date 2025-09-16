@@ -5,6 +5,7 @@ import 'screens/questionnaire/questionnaire_screen.dart';
 import 'screens/messaging/messaging_screen.dart';
 import 'screens/water/water_tracking_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
 
 
@@ -37,6 +38,7 @@ class MyApp extends StatelessWidget {
         '/messaging': (_) => const MessagingScreen(),
         '/water-tracking': (_) => const WaterTrackingScreen(),
         '/settings': (_) => const SettingsScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
 
       onUnknownRoute: (_) => MaterialPageRoute(

@@ -16,7 +16,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   late Animation<double> _progressAnimation;
   
   DateTime _selectedDate = DateTime.now();
-  String _selectedPeriod = 'Day'; // Day, Week, Month
+  String _selectedPeriod = 'Dan'; // Day, Week, Month
   
   // Dummy data - will be replaced with API calls
   double _dailyGoal = 2500; // ml
@@ -27,13 +27,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
       id: 1,
       amount: 250,
       timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      notes: 'Morning glass',
+      notes: 'Čaša',
     ),
     WaterIntake(
       id: 2,
       amount: 500,
       timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-      notes: 'Post workout',
+      notes: 'Nakon treninga',
     ),
     WaterIntake(
       id: 3,
@@ -49,7 +49,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
       id: 5,
       amount: 330,
       timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      notes: 'Bottle',
+      notes: 'Boca',
     ),
   ];
 
@@ -750,11 +750,11 @@ class _AddWaterModalState extends State<_AddWaterModal> {
   
   // Updated with glass types and their typical sizes
   final List<Map<String, dynamic>> _glassTypes = [
-    {'amount': 150.0, 'name': 'Espresso', 'icon': Icons.local_cafe},
+    {'amount': 150.0, 'name': 'Mala šalica', 'icon': Icons.local_cafe},
     {'amount': 250.0, 'name': 'Čaša', 'icon': Icons.local_drink},
-    {'amount': 330.0, 'name': 'Limunka', 'icon': Icons.sports_bar},
+    {'amount': 330.0, 'name': 'Veća čaša', 'icon': Icons.sports_bar},
     {'amount': 500.0, 'name': 'Boca', 'icon': Icons.water_drop},
-    {'amount': 750.0, 'name': 'Sportska', 'icon': Icons.fitness_center},
+    {'amount': 750.0, 'name': 'Sportska boca', 'icon': Icons.fitness_center},
     {'amount': 1000.0, 'name': 'Velika boca', 'icon': Icons.kitchen},
   ];
 

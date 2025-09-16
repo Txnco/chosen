@@ -21,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
+        const SnackBar(content: Text('Molim te popuni prazna polja')),
       );
       return;
     }
@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _passwordController,
                 obscureText: true,
                 decoration: const InputDecoration(
-                  labelText: 'Password',
+                  labelText: 'Lozinka',
                   border: OutlineInputBorder(),
                 ),
                 enabled: !_isLoading,
@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         )
                       : const Text(
-                          'LOGIN',
+                          'Prijavi se',
                           style: TextStyle(
                             letterSpacing: 1,
                             fontWeight: FontWeight.bold,

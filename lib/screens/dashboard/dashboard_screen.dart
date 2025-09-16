@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:chosen/controllers/user_controller.dart';
-import 'package:chosen/controllers/auth_controller.dart';
 import 'package:chosen/models/user.dart';
 import 'package:chosen/managers/questionnaire_manager.dart';
 
@@ -13,7 +12,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   final _userController = UserController();
-  final _authController = AuthController();
   UserModel? _user;
   bool _isLoading = true;
 
@@ -132,7 +130,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 _buildDashboardGrid(),
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.4,
-                  child: _buildTodaysFoodSection(),
+                  //child: _buildTodaysFoodSection(),
                 ),
               ],
             ),
@@ -213,77 +211,25 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildProfileMenu() {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        popupMenuTheme: PopupMenuThemeData(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Colors.black12),
-          ),
-          elevation: 8,
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(context, '/profile');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.grey[300]!, width: 2),
         ),
-      ),
-      child: PopupMenuButton<String>(
-        onSelected: (value) async {
-          if (value == 'settings') {
-            Navigator.pushNamed(context, '/settings');
-          } else if (value == 'logout') {
-            await _authController.logout();
-            if (context.mounted) {
-              Navigator.pushReplacementNamed(context, '/login');
-            }
-          }
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem(
-            value: 'profile',
-            child: Row(
-              children: [
-                Icon(Icons.person_outline, color: Colors.grey[600], size: 18),
-                const SizedBox(width: 12),
-                const Text('Profile', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'settings',
-            child: Row(
-              children: [
-                Icon(Icons.settings_outlined, color: Colors.grey[600], size: 18),
-                const SizedBox(width: 12),
-                const Text('Settings', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'logout',
-            child: Row(
-              children: [
-                Icon(Icons.logout_outlined, color: Colors.red[400], size: 18),
-                const SizedBox(width: 12),
-                Text('Logout', style: TextStyle(fontSize: 14, color: Colors.red[400])),
-              ],
-            ),
-          ),
-        ],
-        child: Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.grey[300]!, width: 2),
-          ),
-          child: CircleAvatar(
-            backgroundColor: Colors.black,
-            radius: 22,
-            child: Text(
-              getUserInitials(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+        child: CircleAvatar(
+          backgroundColor: Colors.black,
+          radius: 22,
+          child: Text(
+            getUserInitials(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
           ),
         ),
@@ -536,71 +482,71 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     );
   }
 
-  Widget _buildTodaysFoodSection() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Row(
-            children: [
-              const Text(
-                'Današnja jela',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '1,247 kcal',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            children: const [
-              _ModernFoodCard(
-                emoji: '🍳',
-                title: 'Breakfast',
-                description: 'Oatmeal & banana',
-                calories: '320 kcal',
-                time: '8:00 AM',
-              ),
-              _ModernFoodCard(
-                emoji: '🥛',
-                title: 'Snack',
-                description: 'Greek yogurt',
-                calories: '150 kcal',
-                time: '10:30 AM',
-              ),
-              _ModernFoodCard(
-                emoji: '🍗',
-                title: 'Lunch',
-                description: 'Chicken & rice',
-                calories: '450 kcal',
-                time: '12:30 PM',
-              ),
-              _ModernFoodCard(
-                emoji: '🍣',
-                title: 'Dinner',
-                description: 'Salmon & veggies',
-                calories: '327 kcal',
-                time: '7:00 PM',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // Widget _buildTodaysFoodSection() {
+  //   return Column(
+  //     children: [
+  //       Container(
+  //         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+  //         child: Row(
+  //           children: [
+  //             const Text(
+  //               'Današnja jela',
+  //               style: TextStyle(
+  //                 fontSize: 20,
+  //                 fontWeight: FontWeight.w600,
+  //                 color: Colors.black,
+  //               ),
+  //             ),
+  //             const Spacer(),
+  //             Text(
+  //               '1,247 kcal',
+  //               style: TextStyle(
+  //                 fontSize: 14,
+  //                 color: Colors.grey[600],
+  //                 fontWeight: FontWeight.w500,
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       Expanded(
+  //         child: ListView(
+  //           padding: const EdgeInsets.symmetric(horizontal: 24),
+  //           children: const [
+  //             _ModernFoodCard(
+  //               emoji: '🍳',
+  //               title: 'Breakfast',
+  //               description: 'Oatmeal & banana',
+  //               calories: '320 kcal',
+  //               time: '8:00 AM',
+  //             ),
+  //             _ModernFoodCard(
+  //               emoji: '🥛',
+  //               title: 'Snack',
+  //               description: 'Greek yogurt',
+  //               calories: '150 kcal',
+  //               time: '10:30 AM',
+  //             ),
+  //             _ModernFoodCard(
+  //               emoji: '🍗',
+  //               title: 'Lunch',
+  //               description: 'Chicken & rice',
+  //               calories: '450 kcal',
+  //               time: '12:30 PM',
+  //             ),
+  //             _ModernFoodCard(
+  //               emoji: '🍣',
+  //               title: 'Dinner',
+  //               description: 'Salmon & veggies',
+  //               calories: '327 kcal',
+  //               time: '7:00 PM',
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
 }
 
 class _QuickAddWaterModal extends StatelessWidget {
