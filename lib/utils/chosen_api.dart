@@ -4,12 +4,18 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 
 class ChosenApi {
-  //static const String baseUrl = 'https://admin.chosen-international.com/api'; // or your production IP/domain
   static const String baseUrl = 'http://10.0.2.2:8000'; // or your production IP/domain
+  // static const String baseUrl = 'http://192.168.1.19:8000'; // or your production IP/domain
   static final _storage = FlutterSecureStorage();
 
-  static Future<String?> _getToken() async {
+  // Made public so TrackingController can access it
+  static Future<String?> getToken() async {
     return await _storage.read(key: 'access_token');
+  }
+
+  // Keep the private method for internal use
+  static Future<String?> _getToken() async {
+    return await getToken();
   }
 
   static Future<Map<String, String>> _buildHeaders({bool includeAuth = true}) async {

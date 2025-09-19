@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/controllers/auth_controller.dart';
 import 'package:chosen/controllers/tracking_controller.dart';
@@ -6,6 +7,9 @@ import 'package:chosen/models/user.dart';
 import 'package:chosen/models/weight_tracking.dart';
 import 'package:chosen/models/day_rating.dart';
 import 'package:chosen/models/progress_photo.dart';
+import 'package:chosen/screens/tracking/weight_tracking_screen.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -55,6 +59,531 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  // Add Weight Dialog
+  void _showAddWeightDialog() {
+    final TextEditingController weightController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.monitor_weight_outlined, color: Colors.black, size: 24),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Add Weight Entry',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: weightController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: 'Weight (kg)',
+                        hintText: 'Enter your weight',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        suffixText: 'kg',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: Colors.black,
+                                  onPrimary: Colors.white,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null && picked != selectedDate) {
+                          setState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today, color: Colors.grey, size: 20),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final weight = double.tryParse(weightController.text);
+                            if (weight != null && weight > 0) {
+                              Navigator.of(context).pop();
+                              
+                              final result = await TrackingController.saveWeight(
+                                weight,
+                                date: selectedDate,
+                              );
+                              if (result != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Weight saved successfully!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                _loadProfileData();
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Failed to save weight'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
+
+  // Add Day Rating Dialog
+  void _showAddDayRatingDialog() {
+    int? selectedScore;
+    final TextEditingController noteController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.sentiment_satisfied, color: Colors.black, size: 24),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Rate Your Day',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'How was your day? (1-10)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(10, (index) {
+                        final score = index + 1;
+                        final isSelected = selectedScore == score;
+                        return GestureDetector(
+                          onTap: () => setState(() => selectedScore = score),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.black : Colors.transparent,
+                              border: Border.all(color: Colors.black),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                score.toString(),
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: noteController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Notes (optional)',
+                        hintText: 'How are you feeling today?',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: selectedScore != null ? () async {
+                            Navigator.of(context).pop();
+                            
+                            final result = await TrackingController.createDayRating(
+                              score: selectedScore,
+                              note: noteController.text.isNotEmpty ? noteController.text : null,
+                            );
+                            
+                            if (result != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Day rating saved!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              _loadProfileData();
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to save rating'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // Add Progress Photo Dialog
+  void _showAddProgressPhotoDialog() {
+    PhotoAngle? selectedAngle;
+    String? imagePath;
+    final ImagePicker picker = ImagePicker();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.photo_camera_outlined, color: Colors.black, size: 24),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Add Progress Photo',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Select photo angle:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildAngleButton('Front', PhotoAngle.front, selectedAngle, (angle) {
+                          setState(() => selectedAngle = angle);
+                        }),
+                        const SizedBox(width: 8),
+                        _buildAngleButton('Side', PhotoAngle.side, selectedAngle, (angle) {
+                          setState(() => selectedAngle = angle);
+                        }),
+                        const SizedBox(width: 8),
+                        _buildAngleButton('Back', PhotoAngle.back, selectedAngle, (angle) {
+                          setState(() => selectedAngle = angle);
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: imagePath != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                File(imagePath!),
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate_outlined, 
+                                     size: 40, color: Colors.grey[400]),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap to select photo',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final XFile? image = await picker.pickImage(
+                                source: ImageSource.camera,
+                                imageQuality: 80,
+                              );
+                              if (image != null) {
+                                setState(() => imagePath = image.path);
+                              }
+                            },
+                            icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                            label: const Text('Camera'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final XFile? image = await picker.pickImage(
+                                source: ImageSource.gallery,
+                                imageQuality: 80,
+                              );
+                              if (image != null) {
+                                setState(() => imagePath = image.path);
+                              }
+                            },
+                            icon: const Icon(Icons.photo_library_outlined, size: 18),
+                            label: const Text('Gallery'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: (selectedAngle != null && imagePath != null) 
+                              ? () async {
+                                  Navigator.of(context).pop();
+                                  
+                                  // Show loading indicator
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                          SizedBox(width: 16),
+                                          Text('Uploading photo...'),
+                                        ],
+                                      ),
+                                      duration: Duration(seconds: 30),
+                                    ),
+                                  );
+                                  
+                                  // Upload the image
+                                  final result = await TrackingController.uploadProgressPhoto(
+                                    selectedAngle!.name,
+                                    imagePath!,
+                                  );
+                                  
+                                  // Clear loading indicator
+                                  ScaffoldMessenger.of(context).clearSnackBars();
+                                  
+                                  if (result != null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Progress photo saved!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                    _loadProfileData();
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to save photo'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                } 
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAngleButton(String label, PhotoAngle angle, PhotoAngle? selectedAngle, Function(PhotoAngle) onTap) {
+    final isSelected = selectedAngle == angle;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(angle),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.black : Colors.transparent,
+            border: Border.all(color: Colors.black),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String getUserInitials() {
@@ -220,82 +749,165 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Praćenje kilaže',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Praćenje kilaže',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildWeightStat(
-                    'Trenutna kilaža',
-                    getCurrentWeight()?.toStringAsFixed(1) ?? '88',
-                    'kg',
-                    Icons.monitor_weight_outlined,
-                  ),
-                  Container(
-                    width: 1,
-                    height: 50,
-                    color: Colors.grey[200],
-                  ),
-                  _buildWeightStat(
-                    'Ukupno unosa',
-                    totalWeightEntries.toString(),
-                    '',
-                    Icons.history,
-                  ),
-                ],
-              ),
-              if (getWeightChange() != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: getWeightChange()! >= 0 ? Colors.red[50] : Colors.green[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        getWeightChange()! >= 0 ? Icons.trending_up : Icons.trending_down,
-                        color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
-                        size: 20,
+            ),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WeightTrackingScreen(),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${getWeightChange()! >= 0 ? '+' : ''}${getWeightChange()!.toStringAsFixed(1)} kg since last entry',
-                        style: TextStyle(
-                          color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
-                          fontWeight: FontWeight.w600,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.show_chart, size: 16, color: Colors.grey[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'View All',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _showAddWeightDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const WeightTrackingScreen(),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildWeightStat(
+                      'Trenutna kilaža',
+                      getCurrentWeight()?.toStringAsFixed(1) ?? '--',
+                      'kg',
+                      Icons.monitor_weight_outlined,
+                    ),
+                    Container(
+                      width: 1,
+                      height: 50,
+                      color: Colors.grey[200],
+                    ),
+                    _buildWeightStat(
+                      'Ukupno unosa',
+                      totalWeightEntries.toString(),
+                      '',
+                      Icons.history,
+                    ),
+                  ],
+                ),
+                if (getWeightChange() != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: getWeightChange()! >= 0 ? Colors.red[50] : Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          getWeightChange()! >= 0 ? Icons.trending_up : Icons.trending_down,
+                          color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${getWeightChange()! >= 0 ? '+' : ''}${getWeightChange()!.toStringAsFixed(1)} kg since last entry',
+                          style: TextStyle(
+                            color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.show_chart, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Tap to view detailed charts',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -349,13 +961,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ocijenjivanje dana',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Ocijenjivanje dana',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
+            GestureDetector(
+              onTap: _showAddDayRatingDialog,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Container(
@@ -479,12 +1111,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: Colors.black,
               ),
             ),
-            Text(
-              '${_progressPhotos.length} slika',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+            Row(
+              children: [
+                Text(
+                  '${_progressPhotos.length} slika',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: _showAddProgressPhotoDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

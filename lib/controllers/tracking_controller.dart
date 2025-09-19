@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:chosen/utils/chosen_api.dart';
 import 'package:chosen/models/weight_tracking.dart';
 import 'package:chosen/models/day_rating.dart';
@@ -23,15 +24,19 @@ class TrackingController {
       return [];
     }
   }
-
-  static Future<WeightTracking?> saveWeight(double weight) async {
+  
+  static Future<WeightTracking?> saveWeight(double weight, {DateTime? date}) async {
     try {
-      final response = await ChosenApi.post('/tracking/weight', {
-        'weight': weight,
-      });
-      
-      if (response.statusCode == 200) {
+      final Map<String, dynamic> body = {'weight': weight};
+      if (date != null) {
+        body['date'] = date.toIso8601String().substring(0, 10);
+      }
+      final response = await ChosenApi.post('/tracking/weight', body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
+        if (data is Map && data['weight'] is String) {
+          data['weight'] = double.tryParse(data['weight']) ?? 0.0;
+        }
         return WeightTracking.fromJson(data);
       } else {
         print('Failed to save weight: ${response.statusCode} - ${response.body}');
@@ -39,6 +44,42 @@ class TrackingController {
       }
     } catch (e) {
       print('Error saving weight: $e');
+      return null;
+    }
+  }
+
+  // Upload progress photo with file
+  static Future<ProgressPhoto?> uploadProgressPhoto(String angle, String imagePath) async {
+    try {
+      final uri = Uri.parse('${ChosenApi.baseUrl}/tracking/progress-photos');
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Add auth header
+      final token = await ChosenApi.getToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      
+      // Add form fields
+      request.fields['angle'] = angle;
+      
+      // Add file
+      request.files.add(
+        await http.MultipartFile.fromPath('file', imagePath)
+      );
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return ProgressPhoto.fromJson(data);
+      } else {
+        print('Failed to upload progress photo: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error uploading progress photo: $e');
       return null;
     }
   }
@@ -82,10 +123,11 @@ class TrackingController {
 
   static Future<DayRating?> createDayRating({int? score, String? note}) async {
     try {
-      final body = <String, dynamic>{};
+      final Map<String, dynamic> body = {};
+      
       if (score != null) body['score'] = score;
-      if (note != null) body['note'] = note;
-
+      if (note != null && note.isNotEmpty) body['note'] = note;
+      
       final response = await ChosenApi.post('/tracking/day-rating', body);
       
       if (response.statusCode == 200) {
@@ -103,10 +145,11 @@ class TrackingController {
 
   static Future<DayRating?> updateDayRating(int ratingId, {int? score, String? note}) async {
     try {
-      final body = <String, dynamic>{};
+      final Map<String, dynamic> body = {};
+      
       if (score != null) body['score'] = score;
       if (note != null) body['note'] = note;
-
+      
       final response = await ChosenApi.put('/tracking/day-rating/$ratingId', body);
       
       if (response.statusCode == 200) {
@@ -129,7 +172,7 @@ class TrackingController {
       if (angle != null) {
         endpoint += '?angle=$angle';
       }
-
+      
       final response = await ChosenApi.get(endpoint);
       
       if (response.statusCode == 200) {
@@ -167,10 +210,11 @@ class TrackingController {
 
   static Future<ProgressPhoto?> updateProgressPhoto(int photoId, {String? angle, String? imageUrl}) async {
     try {
-      final body = <String, dynamic>{};
+      final Map<String, dynamic> body = {};
+      
       if (angle != null) body['angle'] = angle;
       if (imageUrl != null) body['image_url'] = imageUrl;
-
+      
       final response = await ChosenApi.put('/tracking/progress-photos/$photoId', body);
       
       if (response.statusCode == 200) {

@@ -29,17 +29,33 @@ class ProgressPhoto {
       userId: json['user_id'] ?? 0,
       angle: _parseAngle(json['angle']),
       imageUrl: json['image_url'] ?? '',
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : DateTime.now(),
-      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
+      createdAt: json['created_at'] != null 
+        ? DateTime.parse(json['created_at']) 
+        : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+        ? DateTime.parse(json['updated_at']) 
+        : DateTime.now(),
+      deletedAt: json['deleted_at'] != null 
+        ? DateTime.parse(json['deleted_at']) 
+        : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'user_id': userId,
+    'angle': angle.name,
+    'image_url': imageUrl,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'deleted_at': deletedAt?.toIso8601String(),
+  };
 
   static PhotoAngle _parseAngle(dynamic angleValue) {
     if (angleValue == null) return PhotoAngle.front;
     
-    String angleString = angleValue.toString().toLowerCase();
-    switch (angleString) {
+    String angleStr = angleValue.toString().toLowerCase();
+    switch (angleStr) {
       case 'front':
         return PhotoAngle.front;
       case 'side':
@@ -50,25 +66,4 @@ class ProgressPhoto {
         return PhotoAngle.front;
     }
   }
-
-  String get angleString {
-    switch (angle) {
-      case PhotoAngle.front:
-        return 'front';
-      case PhotoAngle.side:
-        return 'side';
-      case PhotoAngle.back:
-        return 'back';
-    }
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'user_id': userId,
-    'angle': angleString,
-    'image_url': imageUrl,
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
-    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
-  };
 }
