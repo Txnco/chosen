@@ -2,129 +2,180 @@
 class WaterIntake {
   final int? id;
   final int? userId;
-  final double amount; // in ml
-  final DateTime timestamp;
-  final String? notes;
+  final int waterIntake; // in ml (matches API field name)
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
 
   WaterIntake({
     this.id,
     this.userId,
-    required this.amount,
-    required this.timestamp,
-    this.notes,
+    required this.waterIntake,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
   });
 
   factory WaterIntake.fromJson(Map<String, dynamic> json) {
     return WaterIntake(
       id: json['id'],
       userId: json['user_id'],
-      amount: (json['amount'] as num).toDouble(),
-      timestamp: DateTime.parse(json['timestamp']),
-      notes: json['notes'],
+      waterIntake: json['water_intake'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
     if (id != null) 'id': id,
     if (userId != null) 'user_id': userId,
-    'amount': amount,
-    'timestamp': timestamp.toIso8601String(),
-    'notes': notes,
+    'water_intake': waterIntake,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    if (deletedAt != null) 'deleted_at': deletedAt!.toIso8601String(),
   };
+
+  // Helper getter for compatibility with existing UI code
+  double get amount => waterIntake.toDouble();
+  DateTime get timestamp => createdAt;
+  String? get notes => null; // API doesn't support notes yet
 }
 
 // lib/models/water_goal.dart
 class WaterGoal {
+  final int? id;
   final int? userId;
-  final double dailyGoal; // in ml
-  final DateTime calculatedAt;
+  final int dailyMl; // in ml (matches API field name)
+  final DateTime createdAt;
+  final DateTime updatedAt;
   
   WaterGoal({
+    this.id,
     this.userId,
-    required this.dailyGoal,
-    required this.calculatedAt,
+    required this.dailyMl,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory WaterGoal.fromJson(Map<String, dynamic> json) {
     return WaterGoal(
+      id: json['id'],
       userId: json['user_id'],
-      dailyGoal: (json['daily_goal'] as num).toDouble(),
-      calculatedAt: DateTime.parse(json['calculated_at']),
+      dailyMl: json['daily_ml'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
     );
   }
 
   Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
     if (userId != null) 'user_id': userId,
-    'daily_goal': dailyGoal,
-    'calculated_at': calculatedAt.toIso8601String(),
+    'daily_ml': dailyMl,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
   };
 
-  // Calculate water goal based on questionnaire data
-  static double calculateWaterGoal({
-    required double weightKg,
-    required double heightCm,
-    required int age,
-    String activityLevel = 'moderate',
-  }) {
-    // Base calculation: 35ml per kg of body weight
-    double baseAmount = weightKg * 35;
-    
-    // Adjust for age (older people need slightly less)
-    if (age > 65) {
-      baseAmount *= 0.9;
-    } else if (age < 30) {
-      baseAmount *= 1.1;
-    }
-    
-    // Adjust for activity level
-    switch (activityLevel.toLowerCase()) {
-      case 'low':
-        baseAmount *= 0.9;
-        break;
-      case 'high':
-        baseAmount *= 1.3;
-        break;
-      case 'moderate':
-      default:
-        baseAmount *= 1.0;
-        break;
-    }
-    
-    // Round to nearest 250ml
-    return ((baseAmount / 250).round() * 250).toDouble();
+  // Helper getter for compatibility with existing UI code
+  double get dailyGoal => dailyMl.toDouble();
+  DateTime get calculatedAt => createdAt;
+}
+
+// lib/models/water_daily_stats.dart
+class WaterDailyStats {
+  final String date;
+  final int totalIntakeMl;
+  final int goalMl;
+  final double progressPercentage;
+  final bool goalReached;
+  final int entryCount;
+  final int remainingMl;
+
+  WaterDailyStats({
+    required this.date,
+    required this.totalIntakeMl,
+    required this.goalMl,
+    required this.progressPercentage,
+    required this.goalReached,
+    required this.entryCount,
+    required this.remainingMl,
+  });
+
+  factory WaterDailyStats.fromJson(Map<String, dynamic> json) {
+    return WaterDailyStats(
+      date: json['date'],
+      totalIntakeMl: json['total_intake_ml'],
+      goalMl: json['goal_ml'],
+      progressPercentage: (json['progress_percentage'] as num).toDouble(),
+      goalReached: json['goal_reached'],
+      entryCount: json['entry_count'],
+      remainingMl: json['remaining_ml'],
+    );
+  }
+
+  // Helper getters for compatibility with existing UI code
+  double get totalIntake => totalIntakeMl.toDouble();
+  double get goalAmount => goalMl.toDouble();
+  int get numberOfEntries => entryCount;
+}
+
+// lib/models/water_weekly_stats.dart
+class WaterWeeklyStats {
+  final String weekStart;
+  final String weekEnd;
+  final int totalIntakeMl;
+  final int weekGoalMl;
+  final int dailyGoalMl;
+  final double progressPercentage;
+  final int daysGoalReached;
+  final List<WaterDailyBreakdown> dailyBreakdown;
+
+  WaterWeeklyStats({
+    required this.weekStart,
+    required this.weekEnd,
+    required this.totalIntakeMl,
+    required this.weekGoalMl,
+    required this.dailyGoalMl,
+    required this.progressPercentage,
+    required this.daysGoalReached,
+    required this.dailyBreakdown,
+  });
+
+  factory WaterWeeklyStats.fromJson(Map<String, dynamic> json) {
+    return WaterWeeklyStats(
+      weekStart: json['week_start'],
+      weekEnd: json['week_end'],
+      totalIntakeMl: json['total_intake_ml'],
+      weekGoalMl: json['week_goal_ml'],
+      dailyGoalMl: json['daily_goal_ml'],
+      progressPercentage: (json['progress_percentage'] as num).toDouble(),
+      daysGoalReached: json['days_goal_reached'],
+      dailyBreakdown: (json['daily_breakdown'] as List)
+          .map((e) => WaterDailyBreakdown.fromJson(e))
+          .toList(),
+    );
   }
 }
 
-// lib/models/water_stats.dart
-class WaterStats {
-  final DateTime date;
-  final double totalIntake;
-  final double goalAmount;
-  final int numberOfEntries;
-  final List<WaterIntake> entries;
+class WaterDailyBreakdown {
+  final String date;
+  final int intakeMl;
+  final int entryCount;
+  final bool goalReached;
 
-  WaterStats({
+  WaterDailyBreakdown({
     required this.date,
-    required this.totalIntake,
-    required this.goalAmount,
-    required this.numberOfEntries,
-    required this.entries,
+    required this.intakeMl,
+    required this.entryCount,
+    required this.goalReached,
   });
 
-  double get progressPercentage => 
-    goalAmount > 0 ? (totalIntake / goalAmount).clamp(0.0, 1.0) : 0.0;
-
-  bool get goalReached => totalIntake >= goalAmount;
-
-  factory WaterStats.fromJson(Map<String, dynamic> json) {
-    return WaterStats(
-      date: DateTime.parse(json['date']),
-      totalIntake: (json['total_intake'] as num).toDouble(),
-      goalAmount: (json['goal_amount'] as num).toDouble(),
-      numberOfEntries: json['number_of_entries'],
-      entries: (json['entries'] as List)
-          .map((e) => WaterIntake.fromJson(e))
-          .toList(),
+  factory WaterDailyBreakdown.fromJson(Map<String, dynamic> json) {
+    return WaterDailyBreakdown(
+      date: json['date'],
+      intakeMl: json['intake_ml'],
+      entryCount: json['entry_count'],
+      goalReached: json['goal_reached'],
     );
   }
 }

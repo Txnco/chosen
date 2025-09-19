@@ -1,6 +1,7 @@
 // lib/screens/water/water_tracking_screen.dart
 import 'package:flutter/material.dart';
 import 'package:chosen/models/water_intake.dart';
+import 'package:chosen/controllers/water_controller.dart';
 import 'dart:math' as math;
 
 class WaterTrackingScreen extends StatefulWidget {
@@ -16,42 +17,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   late Animation<double> _progressAnimation;
   
   DateTime _selectedDate = DateTime.now();
-  String _selectedPeriod = 'Dan'; // Day, Week, Month
+  String _selectedPeriod = 'Day'; // Day, Week, Month
   
-  // Dummy data - will be replaced with API calls
-  double _dailyGoal = 2500; // ml
-  double _currentIntake = 1200; // ml
-  
-  final List<WaterIntake> _todayIntakes = [
-    WaterIntake(
-      id: 1,
-      amount: 250,
-      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      notes: 'Čaša',
-    ),
-    WaterIntake(
-      id: 2,
-      amount: 500,
-      timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-      notes: 'Nakon treninga',
-    ),
-    WaterIntake(
-      id: 3,
-      amount: 250,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-    ),
-    WaterIntake(
-      id: 4,
-      amount: 200,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-    ),
-    WaterIntake(
-      id: 5,
-      amount: 330,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      notes: 'Boca',
-    ),
-  ];
+  // Data from API
+  WaterDailyStats? _dailyStats;
+  List<WaterIntake> _todayIntakes = [];
+  bool _isLoading = true;
+  bool _isAddingWater = false;
 
   @override
   void initState() {
@@ -63,13 +35,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     
     _progressAnimation = Tween<double>(
       begin: 0.0,
-      end: _currentIntake / _dailyGoal,
+      end: 0.0,
     ).animate(CurvedAnimation(
       parent: _progressController,
       curve: Curves.easeInOut,
     ));
     
-    _progressController.forward();
+    _loadDataForDate(_selectedDate);
   }
 
   @override
@@ -78,33 +50,51 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     super.dispose();
   }
 
-  void _showAddWaterModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _AddWaterModal(
-        onAddWater: (amount, notes) {
-          _addWaterIntake(amount, notes);
-        },
-      ),
-    );
+  Future<void> _loadDataForDate(DateTime date) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Ensure user has a water goal first
+      await WaterController.ensureUserHasWaterGoal();
+      
+      // Load daily stats and intake entries
+      final stats = await WaterController.getDailyWaterStats(targetDate: date);
+      final intakes = await WaterController.getWaterIntakeForDate(date);
+      
+      setState(() {
+        _dailyStats = stats;
+        _todayIntakes = intakes;
+        _isLoading = false;
+      });
+      
+      // Update progress animation
+      if (stats != null) {
+        _updateProgressAnimation(stats.progressPercentage / 100);
+      }
+      
+    } catch (e) {
+      print('Error loading water data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load water data: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
-  void _addWaterIntake(double amount, String? notes) {
-    setState(() {
-      _currentIntake += amount;
-      _todayIntakes.add(WaterIntake(
-        amount: amount,
-        timestamp: DateTime.now(),
-        notes: notes,
-      ));
-    });
-    
-    // Update animation
+  void _updateProgressAnimation(double targetProgress) {
     _progressAnimation = Tween<double>(
       begin: _progressAnimation.value,
-      end: (_currentIntake / _dailyGoal).clamp(0.0, 1.0),
+      end: targetProgress.clamp(0.0, 1.0),
     ).animate(CurvedAnimation(
       parent: _progressController,
       curve: Curves.easeInOut,
@@ -114,11 +104,138 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     _progressController.forward();
   }
 
+  void _showAddWaterModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _AddWaterModal(
+        onAddWater: _addWaterIntake,
+        isLoading: _isAddingWater,
+      ),
+    );
+  }
+
+  Future<void> _addWaterIntake(double amount, {bool fromModal = false}) async {
+    setState(() {
+      _isAddingWater = true;
+    });
+
+    try {
+      final newIntake = await WaterController.addWaterIntake(amount.toInt());
+      
+      if (newIntake != null) {
+        // Reload data for the current date
+        await _loadDataForDate(_selectedDate);
+        
+        if (mounted) {
+          if (fromModal) {
+            // Close modal only if called from modal
+            Navigator.of(context).pop();
+          }
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added ${amount.toInt()}ml water intake!'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to add water intake. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error adding water intake: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isAddingWater = false;
+      });
+    }
+  }
+
+  Future<void> _deleteWaterIntake(WaterIntake intake) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Water Intake'),
+        content: Text('Are you sure you want to delete the ${intake.waterIntake}ml intake?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && intake.id != null) {
+      try {
+        final success = await WaterController.deleteWaterIntakeEntry(intake.id!);
+        
+        if (success) {
+          // Reload data
+          await _loadDataForDate(_selectedDate);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Deleted ${intake.waterIntake}ml intake'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to delete intake. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        print('Error deleting water intake: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting intake: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   void _previousDate() {
     setState(() {
       _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-      // TODO: Load data for selected date
     });
+    _loadDataForDate(_selectedDate);
   }
 
   void _nextDate() {
@@ -132,8 +249,8 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     
     setState(() {
       _selectedDate = tomorrow;
-      // TODO: Load data for selected date
     });
+    _loadDataForDate(_selectedDate);
   }
 
   void _selectDate() async {
@@ -160,8 +277,8 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        // TODO: Load data for selected date
       });
+      _loadDataForDate(picked);
     }
   }
 
@@ -200,33 +317,63 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            _buildDateSelector(),
-            const SizedBox(height: 32),
-            _buildProgressSemiCircle(),
-            const SizedBox(height: 32),
-            _buildQuickActions(),
-            const SizedBox(height: 32),
-            _buildPeriodSelector(),
-            const SizedBox(height: 24),
-            _buildIntakeLog(),
-            const SizedBox(height: 100), // Space for FAB
-          ],
-        ),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: FloatingActionButton(
-          onPressed: _showAddWaterModal,
-          backgroundColor: Colors.black,
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-      ),
+      body: _isLoading ? _buildLoadingState() : _buildContent(),
+      floatingActionButton: _buildFloatingActionButton(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: Colors.black,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Loading water data...',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _buildDateSelector(),
+          const SizedBox(height: 32),
+          _buildProgressSemiCircle(),
+          const SizedBox(height: 32),
+          _buildQuickActions(),
+          const SizedBox(height: 24),
+          _buildIntakeLog(),
+          const SizedBox(height: 100), // Space for FAB
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    final isToday = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day) == 
+                   DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    
+    return isToday ? Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: FloatingActionButton(
+        onPressed: _showAddWaterModal,
+        backgroundColor: Colors.black,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    ) : const SizedBox.shrink();
   }
 
   Widget _buildDateSelector() {
@@ -283,9 +430,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
   Widget _buildProgressSemiCircle() {
+    final currentIntake = _dailyStats?.totalIntake ?? 0.0;
+    final dailyGoal = _dailyStats?.goalAmount ?? 2500.0;
+    final progressPercentage = _dailyStats?.progressPercentage ?? 0.0;
+    
     return Container(
       width: 280,
-      height: 180, // Half the height for semicircle
+      height: 180,
       child: Stack(
         children: [
           // Background semicircle
@@ -331,11 +482,11 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                 Icon(
                   Icons.water_drop,
                   size: 32,
-                  color: _getProgressColor(_currentIntake / _dailyGoal),
+                  color: _getProgressColor(progressPercentage / 100),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${_currentIntake.toInt()}ml',
+                  '${currentIntake.toInt()}ml',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
@@ -343,7 +494,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                   ),
                 ),
                 Text(
-                  'od ${_dailyGoal.toInt()}ml',
+                  'od ${dailyGoal.toInt()}ml',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -352,7 +503,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${((_currentIntake / _dailyGoal) * 100).toInt()}% postignut cilj',
+                  '${progressPercentage.toInt()}% postignut cilj',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[500],
@@ -385,72 +536,42 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
   Widget _buildQuickActionButton(int amount) {
+    final isToday = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day) == 
+                   DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    
     return InkWell(
-      onTap: () => _addWaterIntake(amount.toDouble(), null),
+      onTap: isToday ? () => _addWaterIntake(amount.toDouble()) : null,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue[200]!),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.water_drop_outlined, color: Colors.blue[600], size: 28),
-            const SizedBox(height: 8),
-            Text(
-              '+${amount}ml',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.blue[600],
-                fontSize: 14,
+      child: Opacity(
+        opacity: isToday ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.blue[200]!),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.water_drop_outlined, color: Colors.blue[600], size: 28),
+              const SizedBox(height: 8),
+              Text(
+                '+${amount}ml',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[600],
+                  fontSize: 14,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildPeriodSelector() {
-    return Row(
-      children: ['Day', 'Week', 'Month'].map((period) {
-        final isSelected = _selectedPeriod == period;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedPeriod = period),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.black : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? Colors.black : Colors.grey[300]!,
-                ),
-              ),
-              child: Text(
-                period,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey[600],
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 
   Widget _buildIntakeLog() {
-    // Sort intakes by timestamp (newest first)
-    final sortedIntakes = List<WaterIntake>.from(_todayIntakes)
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -458,7 +579,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black,
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -471,9 +592,9 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                const Text(
-                  'Danas unešeno',
-                  style: TextStyle(
+                Text(
+                  '${_formatDate(_selectedDate)} unešeno',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Colors.black,
@@ -487,7 +608,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${sortedIntakes.length} unosa',
+                    '${_todayIntakes.length} unosa',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -499,7 +620,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
             ),
           ),
           const Divider(height: 1),
-          if (sortedIntakes.isEmpty)
+          if (_todayIntakes.isEmpty)
             Padding(
               padding: const EdgeInsets.all(40),
               child: Center(
@@ -510,7 +631,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                          color: Colors.grey[400]),
                     const SizedBox(height: 12),
                     Text(
-                      'Nema unosa za danas',
+                      'Nema unosa za ovaj datum',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey[500],
@@ -524,10 +645,10 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: sortedIntakes.length,
+              itemCount: _todayIntakes.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final intake = sortedIntakes[index];
+                final intake = _todayIntakes[index];
                 return _buildIntakeItem(intake, index == 0);
               },
             ),
@@ -537,8 +658,11 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
   Widget _buildIntakeItem(WaterIntake intake, bool isLatest) {
+    final isToday = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day) == 
+                   DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    
     return Container(
-      color: isLatest ? Colors.blue[25] : Colors.transparent,
+      color: isLatest && isToday ? Colors.blue[25] : Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
@@ -560,7 +684,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                   Row(
                     children: [
                       Text(
-                        '${intake.amount.toInt()}ml',
+                        '${intake.waterIntake}ml',
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -576,7 +700,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (isLatest) ...[
+                      if (isLatest && isToday) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -596,17 +720,6 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                       ],
                     ],
                   ),
-                  if (intake.notes?.isNotEmpty == true) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      intake.notes!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -631,6 +744,15 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                 ),
               ],
             ),
+            if (isToday) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () => _deleteWaterIntake(intake),
+                icon: const Icon(Icons.delete_outline),
+                color: Colors.red[400],
+                iconSize: 20,
+              ),
+            ],
           ],
         ),
       ),
@@ -666,20 +788,20 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     Color iconColor = Colors.white;
     
     if (amount <= 200) {
-      iconData = Icons.local_cafe; // Small cup
+      iconData = Icons.local_cafe;
       iconColor = Colors.blue[700]!;
     } else if (amount <= 350) {
-      iconData = Icons.coffee_outlined; // Medium cup
+      iconData = Icons.coffee_outlined;
       iconColor = Colors.blue[700]!;
     } else if (amount <= 500) {
-      iconData = Icons.local_drink; // Glass
+      iconData = Icons.local_drink;
       iconColor = Colors.blue[700]!;
     } else if (amount <= 750) {
-      iconData = Icons.sports_bar; // Large glass
+      iconData = Icons.sports_bar;
     } else if (amount <= 1000) {
-      iconData = Icons.water_drop; // Bottle
+      iconData = Icons.water_drop;
     } else {
-      iconData = Icons.kitchen; // Large container
+      iconData = Icons.kitchen;
     }
     
     return Icon(iconData, color: iconColor, size: 22);
@@ -695,7 +817,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 }
 
-// Updated SemiCircle painter
+// SemiCircle painter
 class _SemiCircleProgressPainter extends CustomPainter {
   final double progress;
   final Color color;
@@ -709,7 +831,7 @@ class _SemiCircleProgressPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2 + 60); // Adjust center for semicircle
+    final center = Offset(size.width / 2, size.height / 2 + 60);
     final radius = (size.width / 2) - (strokeWidth / 2);
     
     final paint = Paint()
@@ -718,9 +840,8 @@ class _SemiCircleProgressPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    // Draw semicircle from left (180 degrees) to right (0 degrees)
-    const startAngle = math.pi; // Start from left
-    final sweepAngle = math.pi * progress; // Half circle * progress
+    const startAngle = math.pi;
+    final sweepAngle = math.pi * progress;
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -736,9 +857,13 @@ class _SemiCircleProgressPainter extends CustomPainter {
 }
 
 class _AddWaterModal extends StatefulWidget {
-  final Function(double amount, String? notes) onAddWater;
+  final Function(double amount) onAddWater;
+  final bool isLoading;
 
-  const _AddWaterModal({required this.onAddWater});
+  const _AddWaterModal({
+    required this.onAddWater,
+    required this.isLoading,
+  });
 
   @override
   State<_AddWaterModal> createState() => _AddWaterModalState();
@@ -746,9 +871,7 @@ class _AddWaterModal extends StatefulWidget {
 
 class _AddWaterModalState extends State<_AddWaterModal> {
   double _selectedAmount = 250;
-  final TextEditingController _notesController = TextEditingController();
   
-  // Updated with glass types and their typical sizes
   final List<Map<String, dynamic>> _glassTypes = [
     {'amount': 150.0, 'name': 'Mala šalica', 'icon': Icons.local_cafe},
     {'amount': 250.0, 'name': 'Čaša', 'icon': Icons.local_drink},
@@ -757,12 +880,6 @@ class _AddWaterModalState extends State<_AddWaterModal> {
     {'amount': 750.0, 'name': 'Sportska boca', 'icon': Icons.fitness_center},
     {'amount': 1000.0, 'name': 'Velika boca', 'icon': Icons.kitchen},
   ];
-
-  @override
-  void dispose() {
-    _notesController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -834,7 +951,7 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                 final isSelected = _selectedAmount == amount;
                 
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedAmount = amount),
+                  onTap: widget.isLoading ? null : () => setState(() => _selectedAmount = amount),
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected ? Colors.black : Colors.grey[100],
@@ -875,23 +992,12 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                 );
               },
             ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _notesController,
-              decoration: InputDecoration(
-                hintText: 'Dodaj napomenu (opciono)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
             const SizedBox(height: 32),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: widget.isLoading ? null : () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -911,12 +1017,8 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      widget.onAddWater(
-                        _selectedAmount,
-                        _notesController.text.isNotEmpty ? _notesController.text : null,
-                      );
-                      Navigator.pop(context);
+                    onPressed: widget.isLoading ? null : () {
+                      widget.onAddWater(_selectedAmount);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
@@ -925,13 +1027,22 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Dodaj',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: widget.isLoading 
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Dodaj',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                   ),
                 ),
               ],

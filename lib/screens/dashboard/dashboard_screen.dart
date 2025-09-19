@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:chosen/controllers/user_controller.dart';
+import 'package:chosen/controllers/water_controller.dart';
 import 'package:chosen/models/user.dart';
+import 'package:chosen/models/water_intake.dart';
 import 'package:chosen/managers/questionnaire_manager.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -10,10 +12,14 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+class _DashboardScreenState extends State<DashboardScreen> 
+    with WidgetsBindingObserver {
   final _userController = UserController();
   UserModel? _user;
   bool _isLoading = true;
+  WaterDailyStats? _waterStats;
+  bool _isLoadingWater = false;
+  bool _hasInitialized = false;
 
   @override
   void initState() {
@@ -22,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     _initializeDashboard();
   }
 
- Future<void> _initializeDashboard() async {
+  Future<void> _initializeDashboard() async {
     try {
       // First check if questionnaire is completed
       final isQuestionnaireCompleted = await QuestionnaireManager.isQuestionnaireCompleted();
@@ -33,9 +39,13 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         return;
       }
       
-      // If questionnaire is completed, load user data
+      // If questionnaire is completed, load user data and water stats
       await _loadUser();
+      await _loadWaterStats();
+      
+      _hasInitialized = true;
     } catch (e) {
+      print('Dashboard initialization error: $e');
       // On error, redirect to login
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/login');
@@ -47,17 +57,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     }
   }
 
- @override
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     
-    if (state == AppLifecycleState.resumed) {
-      // Recheck questionnaire status when app comes to foreground
-      _initializeDashboard();
+    if (state == AppLifecycleState.resumed && _hasInitialized) {
+      // Refresh water stats when app comes to foreground
+      _loadWaterStats();
     }
   }
 
- 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -73,6 +82,30 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     if(_user == null) {
       // If user is null, redirect to login
       Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
+  Future<void> _loadWaterStats() async {
+    try {
+      setState(() {
+        _isLoadingWater = true;
+      });
+      
+      // Ensure user has a water goal
+      await WaterController.ensureUserHasWaterGoal();
+      
+      // Get today's water stats
+      final stats = await WaterController.getTodayWaterStats();
+      
+      setState(() {
+        _waterStats = stats;
+        _isLoadingWater = false;
+      });
+    } catch (e) {
+      print('Error loading water stats: $e');
+      setState(() {
+        _isLoadingWater = false;
+      });
     }
   }
 
@@ -130,7 +163,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 _buildDashboardGrid(),
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.4,
-                  //child: _buildTodaysFoodSection(),
                 ),
               ],
             ),
@@ -157,7 +189,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildNavItem(Icons.home_outlined, true, () {
-            // Already on dashboard, do nothing or refresh
+            // Already on dashboard, do nothing or refresh water stats
+            _loadWaterStats();
           }),
           _buildNavItem(Icons.fitness_center_outlined, false, () {
             // TODO: Navigate to workout/fitness screen
@@ -268,7 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     );
   }
 
- Widget _buildDashboardGrid() {
+  Widget _buildDashboardGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: GridView.count(
@@ -295,7 +328,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
               // TODO: Navigate to motivation
             },
           ),
-          _buildWaterCard(), // Special water card with plus icon
+          _buildWaterCard(),
           _buildDashboardCard(
             'Trening', 
             Icons.fitness_center_outlined, 
@@ -357,14 +390,18 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildWaterCard() {
-    // Dummy data - will be calculated from user's questionnaire
-    const double currentIntake = 1200; // ml
-    const double dailyGoal = 2500; // ml
-    final double progress = currentIntake / dailyGoal;
+    final currentIntake = _waterStats?.totalIntake ?? 0.0;
+    final dailyGoal = _waterStats?.goalAmount ?? 2500.0;
+    final progress = dailyGoal > 0 ? (currentIntake / dailyGoal) : 0.0;
     
     return InkWell(
-      onTap: () {
-        Navigator.pushNamed(context, '/water-tracking');
+      onTap: () async {
+        // Navigate to water tracking and refresh when returning
+        await Navigator.pushNamed(context, '/water-tracking');
+        // Refresh water stats when returning from water tracking screen
+        if (mounted && _hasInitialized) {
+          _loadWaterStats();
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -394,7 +431,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                     child: Container(
                       width: 38,
                       height: 38,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: Colors.black,
                         shape: BoxShape.circle,
                       ),
@@ -417,44 +454,54 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 ),
               ),
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    '${currentIntake.toInt()}ml',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue[600],
-                    ),
+              if (_isLoadingWater)
+                Text(
+                  'Loading...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
                   ),
-                  Text(
-                    ' / ${dailyGoal.toInt()}ml',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                )
+              else
+                Row(
+                  children: [
+                    Text(
+                      '${currentIntake.toInt()}ml',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue[600],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    Text(
+                      ' / ${dailyGoal.toInt()}ml',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 8),
               // Mini progress bar
-              Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: progress.clamp(0.0, 1.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: progress < 0.5 ? Colors.orange[400] : Colors.blue[600],
-                      borderRadius: BorderRadius.circular(2),
+              if (!_isLoadingWater)
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: progress < 0.5 ? Colors.orange[400] : Colors.blue[600],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -468,8 +515,39 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => _QuickAddWaterModal(
-        onAddWater: (amount) {
-          // TODO: Add water to API and update dashboard
+        onAddWater: _addWaterFromDashboard,
+        onNavigateToWaterTracking: _navigateToWaterTracking,
+        isLoading: _isLoadingWater,
+      ),
+    );
+  }
+
+  Future<void> _navigateToWaterTracking() async {
+    Navigator.pop(context); // Close modal first
+    await Navigator.pushNamed(context, '/water-tracking');
+    // Refresh water stats when returning from water tracking screen
+    if (mounted && _hasInitialized) {
+      _loadWaterStats();
+    }
+  }
+
+  Future<void> _addWaterFromDashboard(double amount) async {
+    setState(() {
+      _isLoadingWater = true;
+    });
+
+    try {
+      final newIntake = await WaterController.addWaterIntake(amount.toInt());
+      
+      if (newIntake != null) {
+        // Reload water stats immediately
+        await _loadWaterStats();
+        
+        if (mounted) {
+          // Close modal
+          Navigator.of(context).pop();
+          
+          // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Dodano ${amount.toInt()}ml vode!'),
@@ -477,82 +555,45 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
               duration: const Duration(seconds: 2),
             ),
           );
-        },
-      ),
-    );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Greška pri dodavanju vode. Pokušajte ponovo.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error adding water from dashboard: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Greška: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoadingWater = false;
+      });
+    }
   }
-
-  // Widget _buildTodaysFoodSection() {
-  //   return Column(
-  //     children: [
-  //       Container(
-  //         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-  //         child: Row(
-  //           children: [
-  //             const Text(
-  //               'Današnja jela',
-  //               style: TextStyle(
-  //                 fontSize: 20,
-  //                 fontWeight: FontWeight.w600,
-  //                 color: Colors.black,
-  //               ),
-  //             ),
-  //             const Spacer(),
-  //             Text(
-  //               '1,247 kcal',
-  //               style: TextStyle(
-  //                 fontSize: 14,
-  //                 color: Colors.grey[600],
-  //                 fontWeight: FontWeight.w500,
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //       Expanded(
-  //         child: ListView(
-  //           padding: const EdgeInsets.symmetric(horizontal: 24),
-  //           children: const [
-  //             _ModernFoodCard(
-  //               emoji: '🍳',
-  //               title: 'Breakfast',
-  //               description: 'Oatmeal & banana',
-  //               calories: '320 kcal',
-  //               time: '8:00 AM',
-  //             ),
-  //             _ModernFoodCard(
-  //               emoji: '🥛',
-  //               title: 'Snack',
-  //               description: 'Greek yogurt',
-  //               calories: '150 kcal',
-  //               time: '10:30 AM',
-  //             ),
-  //             _ModernFoodCard(
-  //               emoji: '🍗',
-  //               title: 'Lunch',
-  //               description: 'Chicken & rice',
-  //               calories: '450 kcal',
-  //               time: '12:30 PM',
-  //             ),
-  //             _ModernFoodCard(
-  //               emoji: '🍣',
-  //               title: 'Dinner',
-  //               description: 'Salmon & veggies',
-  //               calories: '327 kcal',
-  //               time: '7:00 PM',
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //     ],
-  //   );
-  // }
 }
 
 class _QuickAddWaterModal extends StatelessWidget {
   final Function(double amount) onAddWater;
+  final VoidCallback onNavigateToWaterTracking;
+  final bool isLoading;
 
-  const _QuickAddWaterModal({required this.onAddWater});
+  const _QuickAddWaterModal({
+    required this.onAddWater,
+    required this.onNavigateToWaterTracking,
+    required this.isLoading,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -603,10 +644,7 @@ class _QuickAddWaterModal extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/water-tracking');
-                },
+                onPressed: isLoading ? null : onNavigateToWaterTracking,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -632,115 +670,42 @@ class _QuickAddWaterModal extends StatelessWidget {
 
   Widget _buildQuickButton(BuildContext context, int amount) {
     return GestureDetector(
-      onTap: () {
+      onTap: isLoading ? null : () {
         onAddWater(amount.toDouble());
-        Navigator.pop(context);
       },
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue[200]!),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.water_drop_outlined, color: Colors.blue[600], size: 24),
-            const SizedBox(height: 4),
-            Text(
-              '${amount}ml',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.blue[600],
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModernFoodCard extends StatelessWidget {
-  final String emoji;
-  final String title;
-  final String description;
-  final String calories;
-  final String time;
-
-  const _ModernFoodCard({
-    required this.emoji,
-    required this.title,
-    required this.description,
-    required this.calories,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          width: 48,
-          height: 48,
+      child: Opacity(
+        opacity: isLoading ? 0.5 : 1.0,
+        child: Container(
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            color: Colors.grey[50],
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.blue[200]!),
           ),
-          child: Center(
-            child: Text(emoji, style: const TextStyle(fontSize: 24)),
-          ),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            color: Colors.black,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isLoading && amount == 250)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+              else
+                Icon(Icons.water_drop_outlined, color: Colors.blue[600], size: 24),
+              const SizedBox(height: 4),
+              Text(
+                '${amount}ml',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[600],
+                  fontSize: 12,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '$calories • $time',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ),
-        trailing: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.arrow_forward_ios,
-            size: 14,
-            color: Colors.black54,
+            ],
           ),
         ),
       ),

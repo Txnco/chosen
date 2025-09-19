@@ -4,8 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 
 class ChosenApi {
-  static const String baseUrl = 'https://admin.chosen-international.com/api'; // or your production IP/domain
-  // static const String baseUrl = 'http://192.168.1.19:8000'; // or your production IP/domain
+  //static const String baseUrl = 'https://admin.chosen-international.com/api'; // or your production IP/domain
+  static const String baseUrl = 'http://10.0.2.2:8000'; // or your production IP/domain
   static final _storage = FlutterSecureStorage();
 
   static Future<String?> _getToken() async {

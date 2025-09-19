@@ -1,4 +1,3 @@
-// lib/screens/messaging/messaging_screen.dart
 import 'package:flutter/material.dart';
 import 'package:chosen/models/message.dart';
 import 'package:chosen/screens/messaging/chat_screen.dart';
@@ -16,14 +15,15 @@ class _MessagingScreenState extends State<MessagingScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isLoading = true;
+  bool _isInitializing = true; // Track initialization state
   List<Conversation> _conversations = [];
   String? _error;
-  int? _currentUserId; // ✅ Added this
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _initializeMessaging(); // ✅ Changed this
+    _initializeMessaging();
   }
 
   @override
@@ -32,21 +32,48 @@ class _MessagingScreenState extends State<MessagingScreen> {
     super.dispose();
   }
 
-  // ✅ Added this method
   Future<void> _initializeMessaging() async {
-    await _getCurrentUser();
-    await _loadConversations();
+    try {
+      setState(() {
+        _isInitializing = true;
+        _isLoading = true;
+        _error = null;
+      });
+
+      // Wait for both user and conversations to load
+      await Future.wait([
+        _getCurrentUser(),
+        _loadConversations(),
+      ]);
+
+    } catch (e) {
+      print('Error initializing messaging: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to initialize messaging. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isLoading = false;
+        });
+      }
+    }
   }
 
-  // ✅ Added this method
   Future<void> _getCurrentUser() async {
     try {
       final userController = UserController();
       final user = await userController.getStoredUser();
-      if (user != null) {
+      if (user != null && mounted) {
         setState(() {
           _currentUserId = user.id;
         });
+        print('Current user loaded: ${user.id}');
+      } else {
+        print('No user found in storage');
       }
     } catch (e) {
       print('Error getting current user: $e');
@@ -54,18 +81,12 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Future<void> _loadConversations() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
     try {
       final conversations = await MessageController.getConversations();
       
       if (mounted) {
         setState(() {
           _conversations = conversations;
-          _isLoading = false;
         });
       }
       
@@ -80,14 +101,12 @@ class _MessagingScreenState extends State<MessagingScreen> {
         if (mounted) {
           setState(() {
             _conversations = cachedConversations;
-            _isLoading = false;
             _error = 'Using offline data. Pull to refresh.';
           });
         }
       } catch (cacheError) {
         if (mounted) {
           setState(() {
-            _isLoading = false;
             _error = 'Failed to load conversations. Please try again.';
           });
         }
@@ -96,13 +115,25 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Future<void> _refreshConversations() async {
-    await _loadConversations();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await _loadConversations();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   List<Conversation> get _filteredConversations {
     if (_searchQuery.isEmpty) return _conversations;
     return _conversations.where((conversation) =>
-      // ✅ Fixed this - use role-based display name
       conversation.getDisplayName(_currentUserId).toLowerCase().contains(_searchQuery.toLowerCase())
     ).toList();
   }
@@ -158,8 +189,23 @@ class _MessagingScreenState extends State<MessagingScreen> {
           if (_error != null) _buildErrorBanner(),
           _buildSearchBar(),
           Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator(color: Colors.black))
+            child: _isInitializing 
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.black),
+                      SizedBox(height: 16),
+                      Text(
+                        'Učitavanje poruka...',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _refreshConversations,
                   color: Colors.black,
@@ -216,7 +262,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
         controller: _searchController,
         onChanged: (value) => setState(() => _searchQuery = value),
         decoration: InputDecoration(
-          // ✅ Fixed hint text
           hintText: _currentUserId != null && _conversations.isNotEmpty && _currentUserId == _conversations.first.trainerId 
             ? 'Pretražite klijente...' 
             : 'Pretražite...',
@@ -253,13 +298,17 @@ class _MessagingScreenState extends State<MessagingScreen> {
   Widget _buildConversationsList() {
     final conversations = _filteredConversations;
     
-    if (conversations.isEmpty && !_isLoading) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.black));
+    }
+    
+    if (conversations.isEmpty) {
       return _buildEmptyState();
     }
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      physics: const AlwaysScrollableScrollPhysics(), // For pull-to-refresh
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: conversations.length,
       itemBuilder: (context, index) {
         final conversation = conversations[index];
@@ -339,15 +388,16 @@ class _MessagingScreenState extends State<MessagingScreen> {
       ),
       child: ListTile(
         onTap: () async {
-          // Navigate to chat screen
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChatScreen(conversation: conversation),
+              builder: (context) => ChatScreen(
+                conversation: conversation,
+                currentUserId: _currentUserId, // Pass currentUserId explicitly
+              ),
             ),
           );
           
-          // Refresh conversations when returning from chat (in case of new messages)
           if (result == true || result == null) {
             _refreshConversations();
           }
@@ -358,7 +408,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
           children: [
             Expanded(
               child: Text(
-                // ✅ Fixed this - use role-based display name
                 conversation.getDisplayName(_currentUserId),
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
@@ -450,7 +499,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildDefaultAvatar(Conversation conversation) {
-    // ✅ Fixed this - use role-based initials
     final initials = conversation.getInitials(_currentUserId);
     
     return Center(

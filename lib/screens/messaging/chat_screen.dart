@@ -1,4 +1,3 @@
-// lib/screens/messaging/chat_screen.dart
 import 'package:flutter/material.dart';
 import 'package:chosen/models/message.dart';
 import 'package:chosen/controllers/message_controller.dart';
@@ -6,8 +5,13 @@ import 'package:chosen/controllers/user_controller.dart';
 
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
+  final int? currentUserId; // Accept currentUserId as parameter
 
-  const ChatScreen({super.key, required this.conversation});
+  const ChatScreen({
+    super.key, 
+    required this.conversation,
+    this.currentUserId, // Optional parameter
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -17,6 +21,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = true;
+  bool _isInitializing = true; // Track initialization state
   bool _isSending = false;
   List<Message> _messages = [];
   int? _currentUserId;
@@ -25,6 +30,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    // Use passed currentUserId if available, otherwise get it from storage
+    _currentUserId = widget.currentUserId;
     _initializeChat();
   }
 
@@ -35,20 +42,34 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  // ✅ Fixed race condition - sequential execution
   Future<void> _initializeChat() async {
     try {
-      // First, get current user and wait for it to complete
-      await _getCurrentUser();
+      setState(() {
+        _isInitializing = true;
+        _isLoading = true;
+        _error = null;
+      });
+
+      // If we don't have currentUserId, get it from storage
+      if (_currentUserId == null) {
+        await _getCurrentUser();
+      }
       
-      // Only then load messages
+      // Load messages
       await _loadMessages();
+      
     } catch (e) {
       print('Error initializing chat: $e');
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _error = 'Failed to initialize chat. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _isLoading = false;
         });
       }
     }
@@ -62,9 +83,9 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _currentUserId = user.id;
         });
-        print('✅ Current user loaded: ${user.id}'); // Debug log
+        print('Current user loaded: ${user.id}');
       } else {
-        print('❌ No user found in storage');
+        print('No user found in storage');
       }
     } catch (e) {
       print('Error getting current user: $e');
@@ -72,22 +93,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadMessages() async {
-    if (!mounted) return;
-    
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
     try {
-      print('📨 Loading messages for thread ${widget.conversation.id}...'); // Debug log
+      if (widget.conversation.id == null) {
+        throw Exception('Conversation ID is null');
+      }
+
+      print('Loading messages for thread ${widget.conversation.id}...');
       final messages = await MessageController.getMessages(widget.conversation.id!);
-      print('📨 Loaded ${messages.length} messages'); // Debug log
+      print('Loaded ${messages.length} messages');
       
       if (mounted) {
         setState(() {
           _messages = messages;
-          _isLoading = false;
         });
         _scrollToBottom();
       }
@@ -95,7 +112,6 @@ class _ChatScreenState extends State<ChatScreen> {
       print('Error loading messages: $e');
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _error = 'Failed to load messages. Pull down to retry.';
         });
       }
@@ -103,7 +119,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _refreshMessages() async {
-    await _loadMessages();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await _loadMessages();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -143,32 +172,30 @@ class _ChatScreenState extends State<ChatScreen> {
         // Restore text if send failed
         if (mounted) {
           _messageController.text = originalText;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to send message. Please try again.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
+          _showErrorSnackBar('Failed to send message. Please try again.');
         }
       }
     } catch (e) {
       print('Error sending message: $e');
       if (mounted) {
         _messageController.text = originalText;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending message: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _showErrorSnackBar('Error sending message: ${e.toString()}');
       }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
       }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   String _formatMessageTime(DateTime time) {
@@ -230,15 +257,29 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.refresh, color: Colors.black),
             onPressed: _refreshMessages,
           ),
-          // ✅ Removed clear chat menu - just keeping refresh
         ],
       ),
       body: Column(
         children: [
           if (_error != null) _buildErrorBanner(),
           Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator(color: Colors.black))
+            child: _isInitializing 
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.black),
+                      SizedBox(height: 16),
+                      Text(
+                        'Učitavanje poruka...',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _refreshMessages,
                   color: Colors.black,
@@ -326,7 +367,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessagesList() {
-    print('🔍 Building messages list: ${_messages.length} messages, currentUserId: $_currentUserId'); // Debug log
+    print('Building messages list: ${_messages.length} messages, currentUserId: $_currentUserId');
+    
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.black));
+    }
     
     if (_messages.isEmpty) {
       return _buildEmptyState();
@@ -342,7 +387,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final isMe = message.senderId == _currentUserId;
         final showDateSeparator = _shouldShowDateSeparator(index);
         
-        print('💬 Message ${index}: senderId=${message.senderId}, isMe=$isMe, content="${message.content}"'); // Debug log
+        print('Message ${index}: senderId=${message.senderId}, isMe=$isMe, content="${message.content}"');
         
         return Column(
           children: [
@@ -380,6 +425,7 @@ class _ChatScreenState extends State<ChatScreen> {
               fontSize: 14,
               color: Colors.grey[500],
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
