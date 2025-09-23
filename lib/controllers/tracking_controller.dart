@@ -24,7 +24,7 @@ class TrackingController {
       return [];
     }
   }
-  
+
   static Future<WeightTracking?> saveWeight(double weight, {DateTime? date}) async {
     try {
       final Map<String, dynamic> body = {'weight': weight};

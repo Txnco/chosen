@@ -7,6 +7,7 @@ import 'screens/water/water_tracking_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
+import 'screens/tracking/weight_tracking_screen.dart';
 
 
 void main() {
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
         '/water-tracking': (_) => const WaterTrackingScreen(),
         '/settings': (_) => const SettingsScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/weight-tracking': (_) => const WeightTrackingScreen(),
       },
 
       onUnknownRoute: (_) => MaterialPageRoute(

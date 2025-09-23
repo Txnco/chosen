@@ -1,9 +1,15 @@
+// dashboard_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/controllers/water_controller.dart';
 import 'package:chosen/models/user.dart';
 import 'package:chosen/models/water_intake.dart';
+import 'package:chosen/models/weight_tracking.dart';
+import 'package:chosen/controllers/tracking_controller.dart';
 import 'package:chosen/managers/questionnaire_manager.dart';
+import 'package:fl_chart/fl_chart.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -19,14 +25,33 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isLoading = true;
   WaterDailyStats? _waterStats;
   bool _isLoadingWater = false;
+  bool _isLoadingWeight = false;
   bool _hasInitialized = false;
+   List<WeightTracking> _weightHistory = [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeDashboard();
+    _loadWeightData();
   }
+
+  Future<void> _loadWeightData() async {
+      setState(() => _isLoadingWeight = true); 
+      try {
+        final weightHistory = await TrackingController.getWeightTracking();
+        setState(() {
+          _weightHistory = weightHistory;
+        });
+      } catch (e) {
+        print('Error loading weight data: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isLoadingWeight = false);
+        }
+      }
+    }
 
   Future<void> _initializeDashboard() async {
     try {
@@ -161,9 +186,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                 _buildTopBar(),
                 _buildWelcomeSection(),
                 _buildDashboardGrid(),
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.4,
-                ),
+                if (_isLoadingWeight)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                  )
+                else
+                  _buildWeightChart(), // now it actually renders
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -389,6 +419,200 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  // Weight Chart Widget
+Widget _buildWeightChart() {
+  if (_weightHistory.isEmpty) {
+    return Container(
+      margin: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.monitor_weight_outlined, color: Colors.grey[400], size: 40),
+          const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'Još nema unosa težine.\nDodaj prvi unos da vidiš graf.',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  final sortedHistory = List<WeightTracking>.from(_weightHistory)
+    ..sort((a, b) {
+      final dateA = a.date ?? a.createdAt;
+      final dateB = b.date ?? b.createdAt;
+      return dateA.compareTo(dateB);
+    });
+
+  final chartData = sortedHistory.asMap().entries.map((entry) {
+    return FlSpot(entry.key.toDouble(), entry.value.weight);
+  }).toList();
+
+  final minWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b) - 5;
+  final maxWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b) + 5;
+
+  return Container(
+    margin: const EdgeInsets.all(24),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.grey[200]!),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Progres težine',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
+            GestureDetector(
+              onTap: () async {
+                await Navigator.pushNamed(context, '/weight-tracking');
+                if (mounted && _hasInitialized) {
+                  _loadWeightData();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Prikaži sve',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 150,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 5,
+                getDrawingHorizontalLine: (value) {
+                  return FlLine(
+                    color: Colors.grey[200]!,
+                    strokeWidth: 1,
+                  );
+                },
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    interval: 5,
+                    getTitlesWidget: (value, meta) {
+                      return Text(
+                        value.toInt().toString(),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 10,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 20,
+                    interval: sortedHistory.length > 5 ? (sortedHistory.length / 3).floorToDouble() : 1,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index >= 0 && index < sortedHistory.length) {
+                        final date = sortedHistory[index].date ?? sortedHistory[index].createdAt;
+                        return Text(
+                          '${date.day}/${date.month}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9,
+                          ),
+                        );
+                      }
+                      return const Text('');
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(color: Colors.grey[300]!),
+                  bottom: BorderSide(color: Colors.grey[300]!),
+                ),
+              ),
+              minX: 0,
+              maxX: (sortedHistory.length - 1).toDouble(),
+              minY: minWeight,
+              maxY: maxWeight,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: chartData,
+                  isCurved: true,
+                  color: Colors.black,
+                  barWidth: 2,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) {
+                      return FlDotCirclePainter(
+                        radius: 3,
+                        color: Colors.black,
+                        strokeWidth: 2,
+                        strokeColor: Colors.white,
+                      );
+                    },
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: Colors.black.withOpacity(0.1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
   Widget _buildWaterCard() {
     final currentIntake = _waterStats?.totalIntake ?? 0.0;
     final dailyGoal = _waterStats?.goalAmount ?? 2500.0;
@@ -581,6 +805,214 @@ class _DashboardScreenState extends State<DashboardScreen>
         _isLoadingWater = false;
       });
     }
+  }
+}
+
+
+
+// Quick Add Weight Modal
+class _QuickAddWeightModal extends StatefulWidget {
+  final Function(double weight) onAddWeight;
+  final VoidCallback onNavigateToWeightTracking;
+  final bool isLoading;
+
+  const _QuickAddWeightModal({
+    required this.onAddWeight,
+    required this.onNavigateToWeightTracking,
+    required this.isLoading,
+  });
+
+  @override
+  State<_QuickAddWeightModal> createState() => _QuickAddWeightModalState();
+}
+
+class _QuickAddWeightModalState extends State<_QuickAddWeightModal> {
+  final TextEditingController _weightController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void dispose() {
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Icon(
+              Icons.monitor_weight,
+              size: 60,
+              color: Colors.green[600],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Brzi unos težine',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _weightController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Težina (kg)',
+                hintText: 'Unesite svoju težinu',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                suffixText: 'kg',
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () async {
+                final DateTime? picked = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: Colors.black,
+                          onPrimary: Colors.white,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null && picked != _selectedDate) {
+                  setState(() {
+                    _selectedDate = picked;
+                  });
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.grey, size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: widget.isLoading ? null : widget.onNavigateToWeightTracking,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: const BorderSide(color: Colors.black),
+                    ),
+                    child: const Text(
+                      'Detaljni prikaz',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: widget.isLoading ? null : () {
+                      final weight = double.tryParse(_weightController.text);
+                      if (weight != null && weight > 0) {
+                        widget.onAddWeight(weight);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Molimo unesite validnu težinu'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: widget.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Spremi',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 }
 

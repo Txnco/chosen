@@ -783,7 +783,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Icon(Icons.show_chart, size: 16, color: Colors.grey[700]),
                         const SizedBox(width: 4),
                         Text(
-                          'View All',
+                          'Pregledaj sve',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[700],
@@ -880,7 +880,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '${getWeightChange()! >= 0 ? '+' : ''}${getWeightChange()!.toStringAsFixed(1)} kg since last entry',
+                          '${getWeightChange()! >= 0 ? '+' : ''}${getWeightChange()!.toStringAsFixed(1)} kg od zadnjeg unosa',
                           style: TextStyle(
                             color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
                             fontWeight: FontWeight.w600,
@@ -897,7 +897,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Icon(Icons.show_chart, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
-                      'Tap to view detailed charts',
+                      'Pogledaj više detalja',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],

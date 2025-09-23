@@ -23,10 +23,22 @@ class WeightTracking {
       if (v is num) return v.toDouble();
       return double.tryParse(v.toString()) ?? 0.0;
     }
+
+    DateTime? _parseDate(dynamic v) {
+      if (v == null) return null;
+      try {
+        // Handles '2025-09-14' and full ISO strings
+        return DateTime.parse(v.toString());
+      } catch (_) {
+        return null;
+      }
+    }
+
     return WeightTracking(
       id: json['id'] ?? 0,
       userId: json['user_id'] ?? 0,
       weight: parseWeight(json['weight']),
+      date: _parseDate(json['date']),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : DateTime.now(),
       deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
