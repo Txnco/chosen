@@ -8,6 +8,8 @@ import 'package:chosen/models/weight_tracking.dart';
 import 'package:chosen/models/day_rating.dart';
 import 'package:chosen/models/progress_photo.dart';
 import 'package:chosen/screens/tracking/weight_tracking_screen.dart';
+import 'package:chosen/screens/tracking/day_rating_tracking_screen.dart';
+import 'package:chosen/screens/tracking/progress_photos_screen.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
@@ -26,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<WeightTracking> _weightHistory = [];
   DayRating? _lastDayRating;
   List<ProgressPhoto> _progressPhotos = [];
+  List<DayRating> _dayRatings = [];
   
   bool _isLoading = true;
 
@@ -51,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _user = user;
         _weightHistory = weightHistory;
+        _dayRatings = dayRatings;
         _lastDayRating = dayRatings.isNotEmpty ? dayRatings.first : null;
         _progressPhotos = progressPhotos;
       });
@@ -239,7 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const Icon(Icons.sentiment_satisfied, color: Colors.black, size: 24),
                         const SizedBox(width: 12),
                         const Text(
-                          'Rate Your Day',
+                          'Ocijeni svoj dan',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
@@ -250,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'How was your day? (1-10)',
+                      'Kako je prošao tvoj dan? (1-10)',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -292,8 +296,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: noteController,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        labelText: 'Notes (optional)',
-                        hintText: 'How are you feeling today?',
+                        labelText: 'Zašto?',
+                        hintText: 'Zašto daješ ovu ocjenu svom danu?',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -305,7 +309,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
+                          child: const Text('Odustani'),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
@@ -320,7 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             if (result != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Day rating saved!'),
+                                  content: Text('Ocjena dana uspješno spremljena!'),
                                   backgroundColor: Colors.green,
                                 ),
                               );
@@ -328,7 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Failed to save rating'),
+                                  content: Text('Greška kod spremanja ocjene'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -341,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text('Save'),
+                          child: const Text('Spremi'),
                         ),
                       ],
                     ),
@@ -436,7 +440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                      size: 40, color: Colors.grey[400]),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Tap to select photo',
+                                  'Klikni i odaberi sliku',
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 14,
@@ -690,7 +694,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 32),
                   _buildWeightStatsSection(),
                   const SizedBox(height: 24),
-                  _buildLastDayRatingSection(),
+                  _buildDayRatingSection(),
                   const SizedBox(height: 24),
                   _buildProgressPhotosSection(),
                 ],
@@ -957,146 +961,254 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLastDayRatingSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Ocijenjivanje dana',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-            GestureDetector(
-              onTap: _showAddDayRatingDialog,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
+  Widget _buildDayRatingSection() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Ocjenjivanje dana',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
                   color: Colors.black,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.add,
-                  color: Colors.white,
-                  size: 20,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DayRatingTrackingScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.analytics_outlined, size: 16, color: Colors.grey[700]),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Pregledaj sve',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _showAddDayRatingDialog,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          child: _lastDayRating == null
-              ? Column(
-                  children: [
-                    Icon(Icons.sentiment_neutral, size: 48, color: Colors.grey[400]),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Još niste ocijelini svoj dan',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DayRatingTrackingScreen(),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildRatingStat(
+                        'Najnovija ocjena',
+                        _lastDayRating?.score?.toString() ?? '--',
+                        '/10',
+                        _getRatingIcon(_lastDayRating?.score),
+                        _getRatingColor(_lastDayRating?.score),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ocijeni svoj dan!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
+                      Container(
+                        width: 1,
+                        height: 50,
+                        color: Colors.grey[200],
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: _getRatingColor(_lastDayRating!.score).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
+                      _buildRatingStat(
+                        'Prosječna ocjena',
+                        _getAverageRating()?.toStringAsFixed(1) ?? '--',
+                        '/10',
+                        Icons.trending_up,
+                        Colors.blue,
+                      ),
+                    ],
+                  ),
+                  if (_lastDayRating != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _getRatingColor(_lastDayRating!.score).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
                             _getRatingIcon(_lastDayRating!.score),
                             color: _getRatingColor(_lastDayRating!.score),
-                            size: 24,
+                            size: 20,
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ocijena: ${_lastDayRating!.score ?? 'N/A'}/10',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black,
-                                ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _lastDayRating!.note?.isNotEmpty == true 
+                                  ? _lastDayRating!.note!
+                                  : 'Dan ocjenjen ${_formatDate(_lastDayRating!.createdAt)}',
+                              style: TextStyle(
+                                color: _getRatingColor(_lastDayRating!.score),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _formatDate(_lastDayRating!.createdAt),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    if (_lastDayRating!.note != null && _lastDayRating!.note!.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _lastDayRating!.note!,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.analytics_outlined, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Pogledaj više detalja',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
-                  ],
-                ),
-        ),
-      ],
-    );
-  }
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
-  Widget _buildProgressPhotosSection() {
+    Widget _buildRatingStat(String label, String value, String unit, IconData icon, Color color) {
+      return Expanded(
+        child: Column(
+          children: [
+            Icon(icon, size: 24, color: color),
+            const SizedBox(height: 8),
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: value,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  if (unit.isNotEmpty)
+                    TextSpan(
+                      text: ' $unit',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Helper method to calculate average rating
+    double? _getAverageRating() {
+      if (_dayRatings.isEmpty) return null;
+      
+      final validRatings = _dayRatings.where((rating) => rating.score != null).toList();
+      if (validRatings.isEmpty) return null;
+      
+      final sum = validRatings.fold<int>(0, (sum, rating) => sum + (rating.score ?? 0));
+      return sum / validRatings.length;
+    }
+
+    Color _getRatingColor(int? score) {
+      if (score == null) return Colors.grey;
+      if (score >= 8) return Colors.green;
+      if (score >= 6) return Colors.orange;
+      if (score >= 4) return Colors.yellow[700]!;
+      return Colors.red;
+    }
+
+    IconData _getRatingIcon(int? score) {
+      if (score == null) return Icons.sentiment_neutral;
+      if (score >= 8) return Icons.sentiment_very_satisfied;
+      if (score >= 6) return Icons.sentiment_satisfied;
+      if (score >= 4) return Icons.sentiment_neutral;
+      return Icons.sentiment_very_dissatisfied;
+    }
+
+ Widget _buildProgressPhotosSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1113,14 +1225,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             Row(
               children: [
-                Text(
-                  '${_progressPhotos.length} slika',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProgressPhotosScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.photo_library_outlined, size: 16, color: Colors.grey[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Pregledaj sve',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: _showAddProgressPhotoDialog,
                   child: Container(
@@ -1141,79 +1278,249 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        _progressPhotos.isEmpty
-            ? Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[200]!),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.photo_camera_outlined, size: 48, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Nema slika',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Kreni voditi slike napredtka!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              )
-            : GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.8,
-                ),
-                itemCount: _progressPhotos.length > 6 ? 6 : _progressPhotos.length,
-                itemBuilder: (context, index) {
-                  if (index == 5 && _progressPhotos.length > 6) {
-                    return _buildMorePhotosCard(_progressPhotos.length - 5);
-                  }
-                  return _buildProgressPhotoCard(_progressPhotos[index]);
-                },
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProgressPhotosScreen(),
               ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: _progressPhotos.isEmpty
+                ? _buildEmptyPhotosWidget()
+                : _buildPhotosPreviewWidget(),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildProgressPhotoCard(ProgressPhoto photo) {
+  Widget _buildEmptyPhotosWidget() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(
+            Icons.photo_camera_outlined,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Nema slika napredaka',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey[700],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Dodaj svoju prvu sliku napredaka i kreni voditi svoj put!',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[500],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.photo_library_outlined, size: 16, color: Colors.grey[600]),
+            const SizedBox(width: 4),
+            Text(
+              'Pogledaj više detalja',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotosPreviewWidget() {
+    // Group photos by angle
+    Map<PhotoAngle, List<ProgressPhoto>> groupedPhotos = {};
+    for (var photo in _progressPhotos) {
+      if (!groupedPhotos.containsKey(photo.angle)) {
+        groupedPhotos[photo.angle] = [];
+      }
+      groupedPhotos[photo.angle]!.add(photo);
+    }
+
+    return Column(
+      children: [
+        // Stats row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildPhotoStat(
+              'Ukupno slika',
+              _progressPhotos.length.toString(),
+              '',
+              Icons.photo_camera_outlined,
+              Colors.blue,
+            ),
+            Container(
+              width: 1,
+              height: 50,
+              color: Colors.grey[200],
+            ),
+            _buildPhotoStat(
+              'Uglova snimljeno',
+              groupedPhotos.length.toString(),
+              '/3',
+              Icons.view_carousel_outlined,
+              Colors.green,
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 20),
+        
+        // Latest photos preview
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Najnovije slike',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              _formatDate(_progressPhotos.first.createdAt),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Photos grid preview (max 3 photos)
+        SizedBox(
+          height: 80,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _progressPhotos.length > 3 ? 4 : _progressPhotos.length,
+            itemBuilder: (context, index) {
+              if (index == 3) {
+                return _buildMorePhotosPreview(_progressPhotos.length - 3);
+              }
+              return Container(
+                margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
+                child: _buildMiniPhotoCard(_progressPhotos[index]),
+              );
+            },
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Progress indicator for angles
+        _buildAngleProgress(groupedPhotos),
+        
+        const SizedBox(height: 12),
+        
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.photo_library_outlined, size: 16, color: Colors.grey[600]),
+            const SizedBox(width: 4),
+            Text(
+              'Pogledaj sve slike i detalje',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoStat(String label, String value, String unit, IconData icon, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 24, color: color),
+          const SizedBox(height: 8),
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
+                if (unit.isNotEmpty)
+                  TextSpan(
+                    text: ' $unit',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniPhotoCard(ProgressPhoto photo) {
     return Container(
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -1229,7 +1536,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Icon(
                     Icons.image_not_supported_outlined,
                     color: Colors.grey[400],
-                    size: 32,
+                    size: 24,
                   ),
                 );
               },
@@ -1251,42 +1558,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             Positioned(
-              top: 8,
-              right: 8,
+              top: 4,
+              right: 4,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _getAngleDisplayName(photo.angle),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 8,
-              left: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.7),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _formatDateShort(photo.createdAt),
+                  _getAngleDisplayName(photo.angle),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
             ),
@@ -1294,58 +1580,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildMorePhotosCard(int remainingCount) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.photo_library_outlined,
-            size: 32,
-            color: Colors.grey[600],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '+$remainingCount',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          Text(
-            'more',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getRatingColor(int? score) {
-    if (score == null) return Colors.grey;
-    if (score >= 8) return Colors.green;
-    if (score >= 6) return Colors.orange;
-    if (score >= 4) return Colors.yellow[700]!;
-    return Colors.red;
-  }
-
-  IconData _getRatingIcon(int? score) {
-    if (score == null) return Icons.sentiment_neutral;
-    if (score >= 8) return Icons.sentiment_very_satisfied;
-    if (score >= 6) return Icons.sentiment_satisfied;
-    if (score >= 4) return Icons.sentiment_neutral;
-    return Icons.sentiment_very_dissatisfied;
   }
 
   String _getAngleDisplayName(PhotoAngle angle) {
@@ -1357,6 +1591,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case PhotoAngle.back:
         return 'Back';
     }
+  }
+
+  Widget _buildMorePhotosPreview(int remainingCount) {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.photo_library_outlined,
+            size: 20,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '+$remainingCount',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAngleProgress(Map<PhotoAngle, List<ProgressPhoto>> groupedPhotos) {
+    final angles = [PhotoAngle.front, PhotoAngle.side, PhotoAngle.back];
+    final angleNames = ['Front', 'Side', 'Back'];
+    
+    return Row(
+      children: List.generate(3, (index) {
+        final angle = angles[index];
+        final hasPhotos = groupedPhotos.containsKey(angle);
+        final photoCount = hasPhotos ? groupedPhotos[angle]!.length : 0;
+        
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: hasPhotos ? Colors.green[50] : Colors.grey[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: hasPhotos ? Colors.green[200]! : Colors.grey[200]!,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  hasPhotos ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+                  size: 16,
+                  color: hasPhotos ? Colors.green : Colors.grey[400],
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  angleNames[index],
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: hasPhotos ? Colors.green[700] : Colors.grey[600],
+                  ),
+                ),
+                if (hasPhotos) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '($photoCount)',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.green[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }),
+    );
   }
 
   String _formatDate(DateTime date) {

@@ -677,11 +677,14 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
               child: _getGlassIcon(intake.amount),
             ),
             const SizedBox(width: 16),
-            Expanded(
+           Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         '${intake.waterIntake}ml',
@@ -691,7 +694,6 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                           color: Colors.black,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Text(
                         _getGlassSize(intake.amount),
                         style: TextStyle(
@@ -700,8 +702,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (isLatest && isToday) ...[
-                        const SizedBox(width: 8),
+                      if (isLatest && isToday)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -717,7 +718,6 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -745,13 +745,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
               ],
             ),
             if (isToday) ...[
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () => _deleteWaterIntake(intake),
-                icon: const Icon(Icons.delete_outline),
-                color: Colors.red[400],
-                iconSize: 20,
-              ),
+              IconButton( 
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _deleteWaterIntake(intake),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: Colors.red[400],
+              ),  
             ],
           ],
         ),
