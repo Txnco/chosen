@@ -38,15 +38,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadWeightData() async {
-      setState(() => _isLoadingWeight = true); 
-      try {
+    try {
         final weightHistory = await TrackingController.getWeightTracking();
-        setState(() {
-          _weightHistory = weightHistory;
-        });
+        if (mounted) {
+          setState(() {
+            _weightHistory = weightHistory;
+            _isLoadingWeight = false;
+          });
+        }
       } catch (e) {
         print('Error loading weight data: $e');
-      } finally {
         if (mounted) {
           setState(() => _isLoadingWeight = false);
         }
@@ -64,9 +65,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         return;
       }
       
-      // If questionnaire is completed, load user data and water stats
-      await _loadUser();
-      await _loadWaterStats();
+      await Future.wait([
+        _loadUser(),
+        _loadWaterStats(),
+        _loadWeightData(),  // Include weight data in initialization
+      ]);
       
       _hasInitialized = true;
     } catch (e) {
@@ -274,31 +277,44 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildProfileMenu() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(context, '/profile');
-      },
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey[300]!, width: 2),
-        ),
-        child: CircleAvatar(
-          backgroundColor: Colors.black,
-          radius: 22,
-          child: Text(
-            getUserInitials(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        ),
+  final profilePictureUrl = _user?.profilePicture != null
+      ? _userController.getProfilePictureUrl(_user!.profilePicture)
+      : null;
+
+  return GestureDetector(
+    onTap: () async {
+      await Navigator.pushNamed(context, '/profile');
+      // Refresh user data when returning from profile
+      if (mounted && _hasInitialized) {
+        _loadUser();
+      }
+    },
+    child: Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.grey[300]!, width: 2),
       ),
-    );
-  }
+      child: CircleAvatar(
+        backgroundColor: Colors.black,
+        radius: 22,
+        backgroundImage: profilePictureUrl != null
+            ? NetworkImage(profilePictureUrl)
+            : null,
+        child: profilePictureUrl == null
+            ? Text(
+                getUserInitials(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              )
+            : null,
+      ),
+    ),
+  );
+}
 
   Widget _buildWelcomeSection() {
     return Container(
@@ -419,9 +435,47 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // Weight Chart Widget
-Widget _buildWeightChart() {
-  if (_weightHistory.isEmpty) {
+ Widget _buildWeightChart() {
+    if (_weightHistory.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.monitor_weight_outlined, color: Colors.grey[400], size: 40),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'Još nema unosa težine.\nDodaj prvi unos da vidiš graf.',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Sort by date (oldest first for chart display)
+    final sortedHistory = List<WeightTracking>.from(_weightHistory)
+      ..sort((a, b) {
+        final dateA = a.date ?? a.createdAt;
+        final dateB = b.date ?? b.createdAt;
+        return dateA.compareTo(dateB);
+      });
+
+    final chartData = sortedHistory.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.weight);
+    }).toList();
+
+    final weights = sortedHistory.map((e) => e.weight).toList();
+    final minWeight = weights.reduce((a, b) => a < b ? a : b) - 5;
+    final maxWeight = weights.reduce((a, b) => a > b ? a : b) + 5;
+
     return Container(
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(20),
@@ -429,189 +483,152 @@ Widget _buildWeightChart() {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.monitor_weight_outlined, color: Colors.grey[400], size: 40),
-          const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                'Još nema unosa težine.\nDodaj prvi unos da vidiš graf.',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Progres težine',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              GestureDetector(
+                onTap: () async {
+                  await Navigator.pushNamed(context, '/weight-tracking');
+                  if (mounted && _hasInitialized) {
+                    _loadWeightData();
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Prikaži sve',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 150,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 5,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[200]!,
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      interval: 5,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 20,
+                      interval: sortedHistory.length > 5 ? (sortedHistory.length / 3).floorToDouble() : 1,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < sortedHistory.length) {
+                          final date = sortedHistory[index].date ?? sortedHistory[index].createdAt;
+                          return Text(
+                            '${date.day}/${date.month}',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 9,
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    left: BorderSide(color: Colors.grey[300]!),
+                    bottom: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+                minX: 0,
+                maxX: (sortedHistory.length - 1).toDouble(),
+                minY: minWeight,
+                maxY: maxWeight,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: chartData,
+                    isCurved: true,
+                    color: Colors.black,
+                    barWidth: 2,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 3,
+                          color: Colors.black,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: Colors.black.withOpacity(0.1),
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );
   }
-
-  final sortedHistory = List<WeightTracking>.from(_weightHistory)
-    ..sort((a, b) {
-      final dateA = a.date ?? a.createdAt;
-      final dateB = b.date ?? b.createdAt;
-      return dateA.compareTo(dateB);
-    });
-
-  final chartData = sortedHistory.asMap().entries.map((entry) {
-    return FlSpot(entry.key.toDouble(), entry.value.weight);
-  }).toList();
-
-  final minWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b) - 5;
-  final maxWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b) + 5;
-
-  return Container(
-    margin: const EdgeInsets.all(24),
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.grey[200]!),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.04),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Progres težine',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-            GestureDetector(
-              onTap: () async {
-                await Navigator.pushNamed(context, '/weight-tracking');
-                if (mounted && _hasInitialized) {
-                  _loadWeightData();
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Prikaži sve',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          height: 150,
-          child: LineChart(
-            LineChartData(
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: 5,
-                getDrawingHorizontalLine: (value) {
-                  return FlLine(
-                    color: Colors.grey[200]!,
-                    strokeWidth: 1,
-                  );
-                },
-              ),
-              titlesData: FlTitlesData(
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 40,
-                    interval: 5,
-                    getTitlesWidget: (value, meta) {
-                      return Text(
-                        value.toInt().toString(),
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 10,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 20,
-                    interval: sortedHistory.length > 5 ? (sortedHistory.length / 3).floorToDouble() : 1,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index >= 0 && index < sortedHistory.length) {
-                        final date = sortedHistory[index].date ?? sortedHistory[index].createdAt;
-                        return Text(
-                          '${date.day}/${date.month}',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 9,
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                  ),
-                ),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: Border(
-                  left: BorderSide(color: Colors.grey[300]!),
-                  bottom: BorderSide(color: Colors.grey[300]!),
-                ),
-              ),
-              minX: 0,
-              maxX: (sortedHistory.length - 1).toDouble(),
-              minY: minWeight,
-              maxY: maxWeight,
-              lineBarsData: [
-                LineChartBarData(
-                  spots: chartData,
-                  isCurved: true,
-                  color: Colors.black,
-                  barWidth: 2,
-                  isStrokeCapRound: true,
-                  dotData: FlDotData(
-                    show: true,
-                    getDotPainter: (spot, percent, barData, index) {
-                      return FlDotCirclePainter(
-                        radius: 3,
-                        color: Colors.black,
-                        strokeWidth: 2,
-                        strokeColor: Colors.white,
-                      );
-                    },
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    color: Colors.black.withOpacity(0.1),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
   Widget _buildWaterCard() {
     final currentIntake = _waterStats?.totalIntake ?? 0.0;

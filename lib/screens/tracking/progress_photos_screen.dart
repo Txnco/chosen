@@ -402,12 +402,6 @@ class _ProgressPhotosScreenState extends State<ProgressPhotosScreen> with Single
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _showAddProgressPhotoDialog,
-            icon: const Icon(Icons.add, color: Colors.black),
-          ),
-        ],
         bottom: _progressPhotos.isNotEmpty ? TabBar(
           controller: _tabController,
           labelColor: Colors.black,

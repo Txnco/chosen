@@ -37,6 +37,37 @@ class _DayRatingTrackingScreenState extends State<DayRatingTrackingScreen> {
   }
 
   void _showAddRatingDialog() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final todayRating = _ratingHistory.firstWhere(
+        (rating) {
+          final ratingDate = DateTime(
+            rating.createdAt.year,
+            rating.createdAt.month,
+            rating.createdAt.day,
+          );
+          return ratingDate.isAtSameMomentAs(today);
+        },
+        orElse: () => DayRating(
+          id: -1,
+          userId: -1,
+          createdAt: DateTime(1970),
+          updatedAt: DateTime(1970),
+        ),
+      );
+      
+      if (todayRating.id != -1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Već ste ocijenili danas! Možete urediti postojeću ocjenu.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
     int? selectedScore;
     final TextEditingController noteController = TextEditingController();
     
@@ -214,12 +245,6 @@ class _DayRatingTrackingScreenState extends State<DayRatingTrackingScreen> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _showAddRatingDialog,
-            icon: const Icon(Icons.add, color: Colors.black),
-          ),
-        ],
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: Colors.black))

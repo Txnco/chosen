@@ -3,6 +3,7 @@ import 'package:chosen/models/message.dart';
 import 'package:chosen/controllers/message_controller.dart';
 import 'package:chosen/controllers/user_controller.dart';
 
+
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
   final int? currentUserId; // Accept currentUserId as parameter
@@ -20,11 +21,13 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final UserController _userController = UserController();
   bool _isLoading = true;
   bool _isInitializing = true; // Track initialization state
   bool _isSending = false;
   List<Message> _messages = [];
   int? _currentUserId;
+  String? _currentUserProfilePicture;
   String? _error;
 
   @override
@@ -77,13 +80,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _getCurrentUser() async {
     try {
-      final userController = UserController();
-      final user = await userController.getStoredUser();
+      final user = await _userController.getStoredUser();
       if (user != null && mounted) {
         setState(() {
           _currentUserId = user.id;
+          _currentUserProfilePicture = user.profilePicture; // Add this
         });
-        print('Current user loaded: ${user.id}');
+        print('Current user loaded: ${user.id}, profilePicture: ${user.profilePicture}');
       } else {
         print('No user found in storage');
       }
@@ -239,14 +242,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontSize: 16,
                     ),
                   ),
-                  Text(
-                    'Online',
-                    style: TextStyle(
-                      color: Colors.green[600],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -331,6 +326,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildSmallAvatar() {
+
+    final otherUserAvatar = _currentUserId == widget.conversation.trainerId
+        ? widget.conversation.clientAvatar
+        : widget.conversation.trainerAvatar; // You may need to add this field
+
+    final avatarUrl = otherUserAvatar != null
+        ? _userController.getProfilePictureUrl(otherUserAvatar)
+        : null;
+
+
     return Container(
       width: 40,
       height: 40,
@@ -339,15 +344,31 @@ class _ChatScreenState extends State<ChatScreen> {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: widget.conversation.clientAvatar != null
-        ? ClipOval(
-            child: Image.network(
-              widget.conversation.clientAvatar!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildDefaultSmallAvatar(),
-            ),
-          )
-        : _buildDefaultSmallAvatar(),
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading avatar: $error');
+                  return _buildDefaultSmallAvatar();
+                },
+              )
+            : _buildDefaultSmallAvatar(),
+      ),
     );
   }
 
@@ -572,7 +593,16 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildOtherUserAvatar() {
+ Widget _buildOtherUserAvatar() {
+    // Get the other user's profile picture
+    final otherUserAvatar = _currentUserId == widget.conversation.trainerId
+        ? widget.conversation.clientAvatar
+        : widget.conversation.trainerAvatar;
+
+    final avatarUrl = otherUserAvatar != null
+        ? _userController.getProfilePictureUrl(otherUserAvatar)
+        : null;
+
     return Container(
       width: 32,
       height: 32,
@@ -581,6 +611,40 @@ class _ChatScreenState extends State<ChatScreen> {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.grey[200]!),
       ),
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildDefaultOtherUserAvatar();
+                },
+              )
+            : _buildDefaultOtherUserAvatar(),
+      ),
+    );
+  }
+
+  Widget _buildDefaultOtherUserAvatar() {
+    return Container(
+      color: Colors.grey[100],
       child: Center(
         child: Text(
           widget.conversation.getInitials(_currentUserId),
@@ -595,6 +659,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildCurrentUserAvatar() {
+    // Get initials as fallback
+    final currentUserAvatar = _currentUserId == widget.conversation.trainerId
+        ? widget.conversation.trainerAvatar
+        : widget.conversation.clientAvatar;
+
+    final avatarUrl = currentUserAvatar != null
+        ? _userController.getProfilePictureUrl(currentUserAvatar)
+        : null;
+
+    // Get initials as fallback
     String initials = 'U';
     if (_currentUserId == widget.conversation.trainerId) {
       final trainerName = widget.conversation.trainerName;
@@ -630,6 +704,41 @@ class _ChatScreenState extends State<ChatScreen> {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.grey[200]!),
       ),
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading current user avatar: $error');
+                  return _buildDefaultCurrentUserAvatar(initials);
+                },
+              )
+            : _buildDefaultCurrentUserAvatar(initials),
+      ),
+    );
+  }
+
+  Widget _buildDefaultCurrentUserAvatar(String initials) {
+    return Container(
+      color: Colors.black,
       child: Center(
         child: Text(
           initials,

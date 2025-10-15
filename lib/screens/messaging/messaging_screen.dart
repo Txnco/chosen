@@ -13,6 +13,7 @@ class MessagingScreen extends StatefulWidget {
 
 class _MessagingScreenState extends State<MessagingScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final UserController _userController = UserController();
   String _searchQuery = '';
   bool _isLoading = true;
   bool _isInitializing = true; // Track initialization state
@@ -478,6 +479,14 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildAvatar(Conversation conversation) {
+       final otherUserAvatar = _currentUserId == conversation.trainerId
+        ? conversation.clientAvatar
+        : conversation.trainerAvatar;
+
+    final avatarUrl = otherUserAvatar != null
+        ? _userController.getProfilePictureUrl(otherUserAvatar)
+        : null;
+
     return Container(
       width: 56,
       height: 56,
@@ -486,18 +495,34 @@ class _MessagingScreenState extends State<MessagingScreen> {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: conversation.clientAvatar != null
-        ? ClipOval(
-            child: Image.network(
-              conversation.clientAvatar!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(conversation),
-            ),
-          )
-        : _buildDefaultAvatar(conversation),
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading avatar: $error');
+                  return _buildDefaultAvatar(conversation);
+                },
+              )
+            : _buildDefaultAvatar(conversation),
+      ),
     );
   }
-
+  
   Widget _buildDefaultAvatar(Conversation conversation) {
     final initials = conversation.getInitials(_currentUserId);
     

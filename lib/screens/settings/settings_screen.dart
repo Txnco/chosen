@@ -106,8 +106,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (mounted) {
           Navigator.pop(context); // Close loading dialog
           Navigator.pushNamedAndRemoveUntil(
-            context, 
-            '/login', 
+            context,
+            '/login',
             (route) => false,
           );
         }
@@ -128,7 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -152,14 +152,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             )
           : SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
                     _buildProfileSection(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 20),
                     _buildSettingsSection(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 20),
                     _buildLogoutSection(),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -174,38 +175,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         children: [
-          // Avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black,
-              border: Border.all(color: Colors.grey[300]!, width: 3),
-            ),
-            child: Center(
-              child: Text(
-                getUserInitials(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+          // Avatar with image
+          _buildAvatar(),
           const SizedBox(height: 16),
-          
+
           // Name
           Text(
             _user != null
@@ -219,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          
+
           // Email
           Text(
             _user?.email ?? 'No email',
@@ -231,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          
+
           // Edit Profile Button
           SizedBox(
             width: double.infinity,
@@ -266,19 +242,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildAvatar() {
+    // Check if user has an avatar URL
+    final profilePictureUrl = _userController.getProfilePictureUrl(_user?.profilePicture);
+    final hasAvatar = profilePictureUrl != null;
+
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.grey[300]!, width: 3),
+      ),
+      child: ClipOval(
+        child: hasAvatar
+            ? Image.network(
+                profilePictureUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  // Fallback to initials if image fails to load
+                  return _buildInitialsAvatar();
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  );
+                },
+              )
+            : _buildInitialsAvatar(),
+      ),
+    );
+  }
+
+  Widget _buildInitialsAvatar() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Text(
+          getUserInitials(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSettingsSection() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -374,6 +399,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       child: Column(
         children: [
+          Icon(
+            Icons.logout_outlined,
+            size: 48,
+            color: Colors.red[600],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Odjava',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.red[900],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Odjavit ćete se iz aplikacije',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.red[700],
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -388,24 +435,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 elevation: 0,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min, // Keeps button tight to content
-                mainAxisAlignment: MainAxisAlignment.center, // Centers both icon + text
-                children: [
-                  Icon(
-                    Icons.logout_outlined,
-                    size: 20,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Odjavi se',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              child: const Text(
+                'Odjavi se',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),

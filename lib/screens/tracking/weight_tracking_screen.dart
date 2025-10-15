@@ -237,12 +237,6 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _showAddWeightDialog,
-            icon: const Icon(Icons.add, color: Colors.black),
-          ),
-        ],
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: Colors.black))
@@ -273,19 +267,23 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
   }
 
   Widget _buildStatsCards() {
-    double? currentWeight = _weightHistory.isNotEmpty ? _weightHistory.first.weight : null;
+    double? currentWeight;
     double? weightChange;
     
-    if (_weightHistory.length >= 2) {
-      // Sort by date to get proper comparison
+    if (_weightHistory.isNotEmpty) {
+      // Sort by date (newest first) to get current and previous weights
       final sortedHistory = List<WeightTracking>.from(_weightHistory)
         ..sort((a, b) {
           final dateA = a.date ?? a.createdAt;
           final dateB = b.date ?? b.createdAt;
-          return dateB.compareTo(dateA); // Latest first
+          return dateB.compareTo(dateA); // Descending order - newest first
         });
       
-      weightChange = sortedHistory[0].weight - sortedHistory[1].weight;
+      currentWeight = sortedHistory.first.weight;
+      
+      if (sortedHistory.length >= 2) {
+        weightChange = sortedHistory[0].weight - sortedHistory[1].weight;
+      }
     }
 
     return Row(
@@ -538,201 +536,210 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
   }
 
   Widget _buildWeightHistory() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Weight History',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-            Text(
-              '${_weightHistory.length} entries',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _weightHistory.isEmpty
-            ? Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[200]!),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+      // Sort the list by date (newest first) before displaying
+      final sortedHistory = List<WeightTracking>.from(_weightHistory)
+        ..sort((a, b) {
+          final dateA = a.date ?? a.createdAt;
+          final dateB = b.date ?? b.createdAt;
+          return dateB.compareTo(dateA); // Descending - newest first
+        });
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Weight History',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
-                child: Column(
-                  children: [
-                    Icon(Icons.monitor_weight_outlined, size: 48, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No weight entries yet',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Start tracking your weight progress!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              ),
+              Text(
+                '${sortedHistory.length} entries',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
                 ),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _weightHistory.length,
-                itemBuilder: (context, index) {
-                  final entry = _weightHistory[index];
-                  final date = entry.date ?? entry.createdAt;
-                  
-                  // Calculate change from previous entry if available
-                  String changeText = '';
-                  Color changeColor = Colors.grey;
-                  
-                  if (index < _weightHistory.length - 1) {
-                    final previousEntry = _weightHistory[index + 1];
-                    final change = entry.weight - previousEntry.weight;
-                    if (change != 0) {
-                      changeText = '${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)} kg';
-                      changeColor = change >= 0 ? Colors.red : Colors.green;
-                    }
-                  }
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      leading: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.monitor_weight_outlined,
-                            color: Colors.black,
-                            size: 24,
-                          ),
-                        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          sortedHistory.isEmpty
+              ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[200]!),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
-                      title: Text(
-                        '${entry.weight.toStringAsFixed(1)} kg',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.monitor_weight_outlined, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No weight entries yet',
+                        style: TextStyle(
                           fontSize: 16,
-                          color: Colors.black,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text(
-                            '${date.day}/${date.month}/${date.year}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Start tracking your weight progress!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[500],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: sortedHistory.length,
+                  itemBuilder: (context, index) {
+                    final entry = sortedHistory[index];
+                    final date = entry.date ?? entry.createdAt;
+                    
+                    // Calculate change from previous entry (chronologically)
+                    String changeText = '';
+                    Color changeColor = Colors.grey;
+                    
+                    // Since sorted newest first: index 0 is newest, index 1 is previous
+                    if (index < sortedHistory.length - 1) {
+                      final previousEntry = sortedHistory[index + 1];
+                      final change = entry.weight - previousEntry.weight;
+                      if (change != 0) {
+                        changeText = '${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)} kg';
+                        changeColor = change >= 0 ? Colors.red : Colors.green;
+                      }
+                    }
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        leading: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.monitor_weight_outlined,
+                              color: Colors.black,
+                              size: 24,
                             ),
                           ),
-                          if (changeText.isNotEmpty) ...[
-                            const SizedBox(height: 2),
+                        ),
+                        title: Text(
+                          '${entry.weight.toStringAsFixed(1)} kg',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
                             Text(
-                              changeText,
+                              '${date.day}/${date.month}/${date.year}',
                               style: TextStyle(
-                                fontSize: 12,
-                                color: changeColor,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            if (changeText.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                changeText,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: changeColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              // TODO: Implement edit functionality
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Edit functionality coming soon!')),
+                              );
+                            } else if (value == 'delete') {
+                              // TODO: Implement delete functionality
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Delete functionality coming soon!')),
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined, color: Colors.grey[600], size: 18),
+                                  const SizedBox(width: 12),
+                                  const Text('Edit', style: TextStyle(fontSize: 14)),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
+                                  const SizedBox(width: 12),
+                                  Text('Delete', style: TextStyle(fontSize: 14, color: Colors.red[400])),
+                                ],
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'edit') {
-                            // TODO: Implement edit functionality
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Edit functionality coming soon!')),
-                            );
-                          } else if (value == 'delete') {
-                            // TODO: Implement delete functionality
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Delete functionality coming soon!')),
-                            );
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit_outlined, color: Colors.grey[600], size: 18),
-                                const SizedBox(width: 12),
-                                const Text('Edit', style: TextStyle(fontSize: 14)),
-                              ],
-                            ),
+                          child: Icon(
+                            Icons.more_vert,
+                            color: Colors.grey[400],
+                            size: 20,
                           ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete_outline, color: Colors.red[400], size: 18),
-                                const SizedBox(width: 12),
-                                Text('Delete', style: TextStyle(fontSize: 14, color: Colors.red[400])),
-                              ],
-                            ),
-                          ),
-                        ],
-                        child: Icon(
-                          Icons.more_vert,
-                          color: Colors.grey[400],
-                          size: 20,
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
-      ],
-    );
-  }
+                    );
+                  },
+                ),
+        ],
+      );
+    }
 }

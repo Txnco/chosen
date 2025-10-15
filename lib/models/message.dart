@@ -79,6 +79,7 @@ class Conversation {
   // Additional fields for UI
   final String? clientName;      // For trainer view
   final String? trainerName;     // For client view
+   final String? trainerAvatar; 
   final String? clientAvatar;
   final String? lastMessageText;
   final bool hasUnreadMessages;
@@ -94,6 +95,7 @@ class Conversation {
     required this.updatedAt,
     this.clientName,
     this.trainerName,
+    this.trainerAvatar,
     this.clientAvatar,
     this.lastMessageText,
     this.hasUnreadMessages = false,
@@ -113,6 +115,7 @@ class Conversation {
       updatedAt: DateTime.parse(json['updated_at']),
       clientName: json['client_name'],
       trainerName: json['trainer_name'],
+      trainerAvatar: json['trainer_avatar'],
       clientAvatar: json['client_avatar'],
       lastMessageText: json['last_message_text'],
       hasUnreadMessages: json['has_unread_messages'] ?? false,

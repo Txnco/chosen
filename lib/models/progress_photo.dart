@@ -28,7 +28,7 @@ class ProgressPhoto {
       id: json['id'] ?? 0,
       userId: json['user_id'] ?? 0,
       angle: _parseAngle(json['angle']),
-      imageUrl: json['image_url'] ?? '',
+      imageUrl: 'https://admin.chosen-international.com/public/uploads/progress/' + json['image_url'] ?? '',
       createdAt: json['created_at'] != null 
         ? DateTime.parse(json['created_at']) 
         : DateTime.now(),

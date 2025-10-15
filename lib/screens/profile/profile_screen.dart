@@ -222,6 +222,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Add Day Rating Dialog
   void _showAddDayRatingDialog() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    final todayRating = _dayRatings.firstWhere(
+      (rating) {
+        final ratingDate = DateTime(
+          rating.createdAt.year,
+          rating.createdAt.month,
+          rating.createdAt.day,
+        );
+        return ratingDate.isAtSameMomentAs(today);
+      },
+      orElse: () => DayRating(
+        id: -1,
+        userId: -1,
+        createdAt: DateTime(1970),
+        updatedAt: DateTime(1970),
+      ),
+    );
+    
+    if (todayRating.id != -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Već ste ocijenili danas! Možete urediti postojeću ocjenu.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     int? selectedScore;
     final TextEditingController noteController = TextEditingController();
     
@@ -604,12 +635,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   double? getCurrentWeight() {
     if (_weightHistory.isEmpty) return null;
-    return _weightHistory.first.weight;
+    
+    // Sort by date (newest first) to get the most recent weight
+    final sortedHistory = List<WeightTracking>.from(_weightHistory)
+      ..sort((a, b) {
+        final dateA = a.date ?? a.createdAt;
+        final dateB = b.date ?? b.createdAt;
+        return dateB.compareTo(dateA); // Descending order
+      });
+    
+    return sortedHistory.first.weight;
   }
 
   double? getWeightChange() {
     if (_weightHistory.length < 2) return null;
-    return _weightHistory.first.weight - _weightHistory[1].weight;
+    
+    // Sort by date (newest first)
+    final sortedHistory = List<WeightTracking>.from(_weightHistory)
+      ..sort((a, b) {
+        final dateA = a.date ?? a.createdAt;
+        final dateB = b.date ?? b.createdAt;
+        return dateB.compareTo(dateA); // Descending order
+      });
+    
+    // Calculate change between the two most recent entries
+    return sortedHistory[0].weight - sortedHistory[1].weight;
   }
 
   int get totalWeightEntries => _weightHistory.length;
@@ -704,28 +754,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader() {
+ Widget _buildProfileHeader() {
     return Center(
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.grey[300]!, width: 3),
-            ),
-            child: CircleAvatar(
-              backgroundColor: Colors.black,
-              radius: 50,
-              child: Text(
-                getUserInitials(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
+          Stack(
+            children: [
+             Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.grey[300]!, width: 3),
+                ),
+                child: _user?.profilePicture != null
+                    ? CircleAvatar(
+                        backgroundColor: Colors.black,
+                        radius: 50,
+                        child: ClipOval(
+                          child: Image.network(
+                            _userController.getProfilePictureUrl(_user!.profilePicture) ?? '',
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) {
+                                return child;
+                              }
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  color: Colors.white,
+                                  strokeWidth: 3,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              // Show initials if image fails to load
+                              return Container(
+                                width: 100,
+                                height: 100,
+                                color: Colors.black,
+                                child: Center(
+                                  child: Text(
+                                    getUserInitials(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 28,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      )
+                    : CircleAvatar(
+                        backgroundColor: Colors.black,
+                        radius: 50,
+                        child: Text(
+                          getUserInitials(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 28,
+                          ),
+                        ),
+                      ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: _showImagePickerOptions,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
@@ -749,174 +869,369 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildWeightStatsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Praćenje kilaže',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
-            Row(
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const WeightTrackingScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.show_chart, size: 16, color: Colors.grey[700]),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Pregledaj sve',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _showAddWeightDialog,
-                  child: Container(
+                const SizedBox(height: 20),
+                const Text(
+                  'Promijeni profilnu sliku',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.black,
+                      color: Colors.blue[50],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.camera_alt, color: Colors.blue),
                   ),
+                  title: const Text('Kamera'),
+                  subtitle: const Text('Snimi novu sliku'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
                 ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const WeightTrackingScreen(),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildWeightStat(
-                      'Trenutna kilaža',
-                      getCurrentWeight()?.toStringAsFixed(1) ?? '--',
-                      'kg',
-                      Icons.monitor_weight_outlined,
-                    ),
-                    Container(
-                      width: 1,
-                      height: 50,
-                      color: Colors.grey[200],
-                    ),
-                    _buildWeightStat(
-                      'Ukupno unosa',
-                      totalWeightEntries.toString(),
-                      '',
-                      Icons.history,
-                    ),
-                  ],
-                ),
-                if (getWeightChange() != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: getWeightChange()! >= 0 ? Colors.red[50] : Colors.green[50],
+                      color: Colors.purple[50],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          getWeightChange()! >= 0 ? Icons.trending_up : Icons.trending_down,
-                          color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${getWeightChange()! >= 0 ? '+' : ''}${getWeightChange()!.toStringAsFixed(1)} kg od zadnjeg unosa',
-                          style: TextStyle(
-                            color: getWeightChange()! >= 0 ? Colors.red : Colors.green,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: const Icon(Icons.photo_library, color: Colors.purple),
                   ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.show_chart, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Pogledaj više detalja',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                  title: const Text('Galerija'),
+                  subtitle: const Text('Odaberi iz galerije'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
                 ),
+                if (_user?.profilePicture != null)
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.delete_outline, color: Colors.red),
+                    ),
+                    title: const Text('Ukloni sliku'),
+                    subtitle: const Text('Vrati na inicijalnu'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removeProfilePicture();
+                    },
+                  ),
               ],
             ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+
+      if (image != null) {
+        // Show loading indicator
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Text('Uploading profile picture...'),
+                ],
+              ),
+              duration: Duration(seconds: 30),
+            ),
+          );
+        }
+
+        // Upload the image
+        final File imageFile = File(image.path);
+        final success = await _userController.updateProfilePicture(
+          _user!.id,
+          imageFile,
+        );
+
+        // Clear loading indicator
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+        }
+
+        if (success) {
+          // Reload profile data to get the updated image
+          await _loadProfileData();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profilna slika uspješno ažurirana!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Greška kod uploada slike'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Greška: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeProfilePicture() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Ukloni profilnu sliku?'),
+          content: const Text('Jesi li siguran da želiš ukloniti profilnu sliku?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Odustani'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Ukloni'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      // For now, just show a message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Funkcionalnost uklanjanja slike će uskoro biti dostupna'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildWeightStatsSection() {
+      double? currentWeight;
+      double? weightChange;
+      
+      if (_weightHistory.isNotEmpty) {
+        // Sort by date (newest first) to get current and previous weights
+        final sortedHistory = List<WeightTracking>.from(_weightHistory)
+          ..sort((a, b) {
+            final dateA = a.date ?? a.createdAt;
+            final dateB = b.date ?? b.createdAt;
+            return dateB.compareTo(dateA); // Descending order
+          });
+        
+        currentWeight = sortedHistory.first.weight;
+        
+        if (sortedHistory.length >= 2) {
+          weightChange = sortedHistory[0].weight - sortedHistory[1].weight;
+        }
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Praćenje kilaže',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              GestureDetector(
+                onTap: _showAddWeightDialog,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const WeightTrackingScreen(),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildWeightStat(
+                        'Trenutna kilaža',
+                        currentWeight?.toStringAsFixed(1) ?? '--',
+                        'kg',
+                        Icons.monitor_weight_outlined,
+                      ),
+                      Container(
+                        width: 1,
+                        height: 50,
+                        color: Colors.grey[200],
+                      ),
+                      _buildWeightStat(
+                        'Ukupno unosa',
+                        totalWeightEntries.toString(),
+                        '',
+                        Icons.history,
+                      ),
+                    ],
+                  ),
+                  if (weightChange != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: weightChange >= 0 ? Colors.red[50] : Colors.green[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            weightChange >= 0 ? Icons.trending_up : Icons.trending_down,
+                            color: weightChange >= 0 ? Colors.red : Colors.green,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${weightChange >= 0 ? '+' : ''}${weightChange.toStringAsFixed(1)} kg od zadnjeg unosa',
+                            style: TextStyle(
+                              color: weightChange >= 0 ? Colors.red : Colors.green,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.show_chart, size: 16, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Pogledaj više detalja',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
   Widget _buildWeightStat(String label, String value, String unit, IconData icon) {
     return Expanded(
@@ -976,57 +1291,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.black,
                 ),
               ),
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const DayRatingTrackingScreen(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.analytics_outlined, size: 16, color: Colors.grey[700]),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Pregledaj sve',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              GestureDetector(
+                onTap: _showAddDayRatingDialog,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _showAddDayRatingDialog,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 20,
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1223,57 +1501,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: Colors.black,
               ),
             ),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProgressPhotosScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.photo_library_outlined, size: 16, color: Colors.grey[700]),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Pregledaj sve',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            GestureDetector(
+              onTap: _showAddProgressPhotoDialog,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _showAddProgressPhotoDialog,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+                child: const Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 20,
                 ),
-              ],
+              ),
             ),
           ],
         ),

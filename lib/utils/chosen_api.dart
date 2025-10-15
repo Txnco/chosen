@@ -1,12 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:io';
 
 
 class ChosenApi {
   static const String baseUrl = 'https://admin.chosen-international.com/api/'; // or your production IP/domain
-  //static const String baseUrl = 'http://10.0.2.2:8000'; // or your production IP/domain
- //static const String baseUrl = 'http://192.168.1.19:8000'; // or your production IP/domain
+  // static const String baseUrl = 'http://10.0.2.2:8000'; // or your production IP/domain
+  static const String uploadsUrl = 'https://admin.chosen-international.com/public'; // or your production IP/domain
   static final _storage = FlutterSecureStorage();
 
   // Made public so TrackingController can access it
@@ -56,4 +57,51 @@ class ChosenApi {
     final headers = await _buildHeaders(includeAuth: auth);
     return http.delete(Uri.parse('$baseUrl$endpoint'), headers: headers);
   }
+
+   static Future<http.Response> putMultipart(
+    String endpoint, 
+    {
+      Map<String, String>? fields,
+      File? file,
+      String fileFieldName = 'profile_picture',
+      bool auth = true,
+    }
+  ) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final request = http.MultipartRequest('PUT', uri);
+
+      // Add authorization header
+      if (auth) {
+        final token = await _getToken();
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+      }
+
+      // Add form fields
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+
+      // Add file if provided
+      if (file != null) {
+        final multipartFile = await http.MultipartFile.fromPath(
+          fileFieldName,
+          file.path,
+        );
+        request.files.add(multipartFile);
+      }
+
+      // Send request
+      final streamedResponse = await request.send();
+      
+      // Convert streamed response to regular response
+      return await http.Response.fromStream(streamedResponse);
+    } catch (e) {
+      print('Error in putMultipart: $e');
+      rethrow;
+    }
+  }
+
 }
