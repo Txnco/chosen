@@ -20,7 +20,7 @@ class ChosenApi {
     return await getToken();
   }
 
-  static Future<Map<String, String>> _buildHeaders({bool includeAuth = true}) async {
+  static Future<Map<String, String>> _buildHeaders({bool includeAuth = true, Map<String, String>? additionalHeaders}) async {
     
     final headers = {'Content-Type': 'application/json'};
 
@@ -35,27 +35,36 @@ class ChosenApi {
        }
     }
 
+    if (additionalHeaders != null) {
+      headers.addAll(additionalHeaders);
+    }
+
     return headers;
   }
 
-  static Future<http.Response> get(String endpoint, {bool auth = true}) async {
-    final headers = await _buildHeaders(includeAuth: auth);
-    return http.get(Uri.parse('$baseUrl$endpoint'), headers: headers);
+  static Future<http.Response> get(String endpoint, {bool auth = true, Map<String, String>? headers}) async {
+    final requestHeaders  = await _buildHeaders(includeAuth: auth, additionalHeaders: headers);
+    return http.get(Uri.parse('$baseUrl$endpoint'), headers: requestHeaders );
   }
 
-  static Future<http.Response> post(String endpoint, Map<String, dynamic> body, {bool auth = true}) async {
-    final headers = await _buildHeaders(includeAuth: auth);
-    return http.post(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body));
+  static Future<http.Response> post(String endpoint, Map<String, dynamic> body, {bool auth = true, Map<String, String>? headers}) async {
+    final requestHeaders  = await _buildHeaders(includeAuth: auth, additionalHeaders: headers);
+    return http.post(Uri.parse('$baseUrl$endpoint'), headers: requestHeaders , body: jsonEncode(body));
   }
 
-  static Future<http.Response> put(String endpoint, Map<String, dynamic> body, {bool auth = true}) async {
-    final headers = await _buildHeaders(includeAuth: auth);
-    return http.put(Uri.parse('$baseUrl$endpoint'), headers: headers, body: jsonEncode(body));
+  static Future<http.Response> put(String endpoint, Map<String, dynamic> body, {bool auth = true, Map<String, String>? headers}) async {
+    final requestHeaders  = await _buildHeaders(includeAuth: auth, additionalHeaders: headers);
+    return http.put(Uri.parse('$baseUrl$endpoint'), headers: requestHeaders , body: jsonEncode(body));
   }
 
-  static Future<http.Response> delete(String endpoint, {bool auth = true}) async {
-    final headers = await _buildHeaders(includeAuth: auth);
-    return http.delete(Uri.parse('$baseUrl$endpoint'), headers: headers);
+  static Future<http.Response> delete(String endpoint, {bool auth = true, Map<String, String>? headers}) async {
+    final requestHeaders  = await _buildHeaders(includeAuth: auth, additionalHeaders: headers);
+    return http.delete(Uri.parse('$baseUrl$endpoint'), headers: requestHeaders );
+  }
+
+  static Future<http.Response> patch(String endpoint, Map<String, dynamic> body, {bool auth = true, Map<String, String>? headers}) async {
+    final requestHeaders  = await _buildHeaders(includeAuth: auth, additionalHeaders: headers);
+    return http.patch(Uri.parse('$baseUrl$endpoint'), headers: requestHeaders, body: jsonEncode(body));
   }
 
    static Future<http.Response> putMultipart(

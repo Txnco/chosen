@@ -8,6 +8,7 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/tracking/weight_tracking_screen.dart';
+import 'screens/events/event_screen.dart';
 
 
 void main() {
@@ -41,6 +42,7 @@ class MyApp extends StatelessWidget {
         '/settings': (_) => const SettingsScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/weight-tracking': (_) => const WeightTrackingScreen(),
+        '/events': (context) => const EventScreen(),
       },
 
       onUnknownRoute: (_) => MaterialPageRoute(

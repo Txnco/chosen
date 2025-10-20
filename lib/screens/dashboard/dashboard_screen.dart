@@ -205,9 +205,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildBottomNavBar() {
+    Widget _buildBottomNavBar() {
     return Container(
-      height: 70,
       decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -218,24 +217,24 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(Icons.home_outlined, true, () {
-            // Already on dashboard, do nothing or refresh water stats
-            _loadWaterStats();
-          }),
-          _buildNavItem(Icons.fitness_center_outlined, false, () {
-            // TODO: Navigate to workout/fitness screen
-          }),
-          _buildNavItem(Icons.chat_outlined, false, () {
-            // Navigate to messaging screen
-            Navigator.pushNamed(context, '/messaging');
-          }),
-          _buildNavItem(Icons.settings_outlined, false, () {
-            Navigator.pushNamed(context, '/settings');
-          }),
-        ],
+      child: SafeArea(
+        child: Container(
+          height: 70,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildNavItem(Icons.home_outlined, true, () {
+                _loadWaterStats();
+              }),
+              _buildNavItem(Icons.chat_outlined, false, () {
+                Navigator.pushNamed(context, '/messaging');
+              }),
+              _buildNavItem(Icons.settings_outlined, false, () {
+                Navigator.pushNamed(context, '/settings');
+              }),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -361,26 +360,38 @@ class _DashboardScreenState extends State<DashboardScreen>
           _buildDashboardCard(
             'Dnevni plan', 
             Icons.today_outlined, 
-            '5 tasks',
+            'Kreni i planiraj svoj dan!',
             onTap: () {
-              // TODO: Navigate to daily plan
+              Navigator.pushNamed(context, '/events');
             },
           ),
           _buildDashboardCard(
-            'Motivacija dana', 
-            Icons.bolt_outlined, 
-            'Samo nastavi!',
+            'Prehrana', 
+            Icons.food_bank, 
+            'Jedi pravilno!',
             onTap: () {
-              // TODO: Navigate to motivation
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Opcija dolazi uskoro!'),
+                  backgroundColor: Colors.blue[600],
+                  duration: const Duration(seconds: 2),
+                ),
+              );
             },
           ),
           _buildWaterCard(),
           _buildDashboardCard(
             'Trening', 
-            Icons.fitness_center_outlined, 
-            '45 min',
+            Icons.fitness_center_outlined,
+            'Napravi trening!',
             onTap: () {
-              // TODO: Navigate to workout
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Opcija dolazi uskoro!'),
+                  backgroundColor: Colors.blue[600],
+                  duration: const Duration(seconds: 2),
+                ),
+              );
             },
           ),
         ],
