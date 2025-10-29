@@ -47,7 +47,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           });
         }
       } catch (e) {
-        print('Error loading weight data: $e');
         if (mounted) {
           setState(() => _isLoadingWeight = false);
         }
@@ -73,7 +72,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       
       _hasInitialized = true;
     } catch (e) {
-      print('Dashboard initialization error: $e');
       // On error, redirect to login
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/login');
@@ -130,7 +128,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         _isLoadingWater = false;
       });
     } catch (e) {
-      print('Error loading water stats: $e');
       setState(() {
         _isLoadingWater = false;
       });
@@ -188,6 +185,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: [
                 _buildTopBar(),
                 _buildWelcomeSection(),
+                _buildMotivationCard(),
                 _buildDashboardGrid(),
                 if (_isLoadingWeight)
                   const Padding(
@@ -195,7 +193,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
                   )
                 else
-                  _buildWeightChart(), // now it actually renders
+                  _buildWeightChart(),
                 const SizedBox(height: 32),
               ],
             ),
@@ -218,7 +216,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       child: SafeArea(
-        child: Container(
+        child: SizedBox(
           height: 70,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -320,28 +318,89 @@ class _DashboardScreenState extends State<DashboardScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${getWelcomeMessage()}, ${getUserName()}!',
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w300,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Jesi li spreman danas srušiti svoje ciljeve?',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
+        child: Text(
+          '${getWelcomeMessage()}, ${getUserName()}!',
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w300,
+            color: Colors.black,
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMotivationCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.black, Colors.grey[800]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.format_quote,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Motivacija dana',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Uspjeh nije slučajan. To je težak rad, upornost, učenje, proučavanje, žrtva i najviše od svega, ljubav prema onome što radiš.',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: Colors.white,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '— Pelé',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.8),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -365,29 +424,23 @@ class _DashboardScreenState extends State<DashboardScreen>
               Navigator.pushNamed(context, '/events');
             },
           ),
-          _buildDashboardCard(
-            'Prehrana', 
-            Icons.food_bank, 
-            'Jedi pravilno!',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Opcija dolazi uskoro!'),
-                  backgroundColor: Colors.blue[600],
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
           _buildWaterCard(),
           _buildDashboardCard(
-            'Trening', 
-            Icons.fitness_center_outlined,
-            'Napravi trening!',
+            'Poruka treneru', 
+            Icons.chat_bubble_outline, 
+            'Razgovaraj s trenerom',
+            onTap: () {
+              Navigator.pushNamed(context, '/messaging');
+            },
+          ),
+          _buildDashboardCard(
+            'Pozovi trenera', 
+            Icons.phone_outlined,
+            'Kontaktiraj trenera',
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Opcija dolazi uskoro!'),
+                  content: const Text('Funkcija poziva dolazi uskoro!'),
                   backgroundColor: Colors.blue[600],
                   duration: const Duration(seconds: 2),
                 ),
@@ -410,7 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -496,7 +549,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -526,7 +579,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
@@ -629,7 +682,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                     ),
                   ),
                 ],
@@ -663,7 +716,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -676,7 +729,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               Row(
                 children: [
-                  Icon(Icons.water_drop_outlined, size: 32, color: Colors.black),
+                  const Icon(Icons.water_drop_outlined, size: 32, color: Colors.black),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => _showQuickAddWater(),
@@ -819,7 +872,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       }
     } catch (e) {
-      print('Error adding water from dashboard: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
