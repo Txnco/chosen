@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/controllers/auth_controller.dart';
 import 'package:chosen/models/user.dart';
+import 'package:chosen/providers/theme_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -43,8 +45,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '$first$last'.toUpperCase();
   }
 
+  String _getThemeModeName(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Svijetla';
+      case ThemeMode.dark:
+        return 'Tamna';
+      case ThemeMode.system:
+        return 'Sistemska';
+    }
+  }
+
+  void _showThemeDialog(ThemeProvider themeProvider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Odaberite temu',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('Svijetla'),
+              value: ThemeMode.light,
+              groupValue: themeProvider.themeMode,
+              onChanged: (value) {
+                themeProvider.setThemeMode(value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Tamna'),
+              value: ThemeMode.dark,
+              groupValue: themeProvider.themeMode,
+              onChanged: (value) {
+                themeProvider.setThemeMode(value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Sistemska'),
+              value: ThemeMode.system,
+              groupValue: themeProvider.themeMode,
+              onChanged: (value) {
+                themeProvider.setThemeMode(value!);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleLogout() async {
-    // Show confirmation dialog
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -92,19 +154,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (shouldLogout == true) {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(color: Colors.black),
+        builder: (context) => Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
       );
 
       try {
         await _authController.logout();
         if (mounted) {
-          Navigator.pop(context); // Close loading dialog
+          Navigator.pop(context);
           Navigator.pushNamedAndRemoveUntil(
             context,
             '/login',
@@ -113,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       } catch (e) {
         if (mounted) {
-          Navigator.pop(context); // Close loading dialog
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Greška pri odjavi: ${e.toString()}'),
@@ -127,19 +190,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Postavke',
           style: TextStyle(
-            color: Colors.black,
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
@@ -147,8 +208,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.black),
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             )
           : SingleChildScrollView(
               child: Padding(
@@ -157,7 +220,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _buildProfileSection(),
                     const SizedBox(height: 20),
-                    _buildSettingsSection(),
+                    _buildSettingsSection(themeProvider),
                     const SizedBox(height: 20),
                     _buildLogoutSection(),
                     const SizedBox(height: 20),
@@ -169,81 +232,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildProfileSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        children: [
-          // Avatar with image
-          _buildAvatar(),
-          const SizedBox(height: 16),
-
-          // Name
-          Text(
-            _user != null
-                ? '${_user!.firstName} ${_user!.lastName}'.trim()
-                : 'Unknown User',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            _buildAvatar(),
+            const SizedBox(height: 16),
+            Text(
+              _user != null
+                  ? '${_user!.firstName} ${_user!.lastName}'.trim()
+                  : 'Unknown User',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-
-          // Email
-          Text(
-            _user?.email ?? 'No email',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w400,
+            const SizedBox(height: 8),
+            Text(
+              _user?.email ?? 'No email',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).textTheme.bodySmall?.color,
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-
-          // Edit Profile Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                // TODO: Navigate to edit profile screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Uređivanje profila će biti dostupno uskoro'),
-                    backgroundColor: Colors.blue,
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Uređivanje profila će biti dostupno uskoro'),
+                      backgroundColor: Colors.blue,
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
-                side: const BorderSide(color: Colors.black),
-              ),
-              child: const Text(
-                'Uredi profil',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
+                child: Text(
+                  'Uredi profil',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAvatar() {
-    // Check if user has an avatar URL
     final profilePictureUrl = _userController.getProfilePictureUrl(_user?.profilePicture);
     final hasAvatar = profilePictureUrl != null;
 
@@ -252,7 +304,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey[300]!, width: 3),
+        border: Border.all(
+          color: Theme.of(context).dividerColor,
+          width: 3,
+        ),
       ),
       child: ClipOval(
         child: hasAvatar
@@ -260,7 +315,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 profilePictureUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
-                  // Fallback to initials if image fails to load
                   return _buildInitialsAvatar();
                 },
                 loadingBuilder: (context, child, loadingProgress) {
@@ -272,7 +326,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               loadingProgress.expectedTotalBytes!
                           : null,
                       strokeWidth: 2,
-                      color: Colors.black,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   );
                 },
@@ -284,12 +338,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildInitialsAvatar() {
     return Container(
-      color: Colors.black,
+      color: Theme.of(context).colorScheme.primary,
       child: Center(
         child: Text(
           getUserInitials(),
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onPrimary,
             fontSize: 28,
             fontWeight: FontWeight.bold,
           ),
@@ -298,15 +352,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSettingsSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
+  Widget _buildSettingsSection(ThemeProvider themeProvider) {
+    return Card(
       child: Column(
         children: [
+          _buildSettingsItem(
+            icon: Icons.brightness_6_outlined,
+            title: 'Izgled',
+            subtitle: _getThemeModeName(themeProvider.themeMode),
+            onTap: () => _showThemeDialog(themeProvider),
+          ),
+          _buildDivider(),
           _buildSettingsItem(
             icon: Icons.notifications_outlined,
             title: 'Obavještenja',
@@ -465,12 +521,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
-                color: Colors.grey[700],
+                color: Theme.of(context).iconTheme.color,
                 size: 20,
               ),
             ),
@@ -484,7 +540,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -492,7 +547,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                   ),
                 ],
@@ -501,7 +556,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey[400],
+              color: Theme.of(context).iconTheme.color?.withOpacity(0.4),
             ),
           ],
         ),
@@ -513,7 +568,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       height: 1,
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      color: Colors.grey[200],
+      color: Theme.of(context).dividerColor,
     );
   }
 }

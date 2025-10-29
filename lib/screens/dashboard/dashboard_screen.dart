@@ -9,6 +9,8 @@ import 'package:chosen/models/weight_tracking.dart';
 import 'package:chosen/controllers/tracking_controller.dart';
 import 'package:chosen/managers/questionnaire_manager.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:chosen/models/motivational_quote.dart';
+import 'package:chosen/controllers/quote_controller.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -27,7 +29,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isLoadingWater = false;
   bool _isLoadingWeight = false;
   bool _hasInitialized = false;
-   List<WeightTracking> _weightHistory = [];
+  List<WeightTracking> _weightHistory = [];
+  MotivationalQuote? _dailyQuote; 
+  bool _isLoadingQuote = true; 
 
   @override
   void initState() {
@@ -35,6 +39,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     _initializeDashboard();
     _loadWeightData();
+  }
+
+  Future<void> _loadDailyQuote() async {
+    try {
+      final quote = await QuoteController.getDailyQuote(); // Changed from getRandomQuote
+      if (mounted) {
+        setState(() {
+          _dailyQuote = quote;
+          _isLoadingQuote = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingQuote = false);
+      }
+    }
   }
 
   Future<void> _loadWeightData() async {
@@ -68,6 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         _loadUser(),
         _loadWaterStats(),
         _loadWeightData(),  // Include weight data in initialization
+        _loadDailyQuote(),
       ]);
       
       _hasInitialized = true;
@@ -331,79 +352,197 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildMotivationCard() {
+  if (_isLoadingQuote) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.black, Colors.grey[800]!],
+          colors: [Color(0xFF1a1a2e), Color(0xFF16213e)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.format_quote,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Motivacija dana',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Uspjeh nije slučajan. To je težak rad, upornost, učenje, proučavanje, žrtva i najviše od svega, ljubav prema onome što radiš.',
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              color: Colors.white,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '— Pelé',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.8),
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        ],
+      child: const Center(
+        child: CircularProgressIndicator(
+          color: Colors.white,
+          strokeWidth: 2,
+        ),
       ),
     );
   }
+
+  final displayQuote = _dailyQuote?.quote ?? 
+      'Uspjeh nije slučajan. To je težak rad, upornost, učenje, proučavanje, žrtva i najviše od svega, ljubav prema onome što radiš.';
+  final displayAuthor = _dailyQuote?.author ?? 'Unknown';
+
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFF1a1a2e), Color(0xFF16213e)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.format_quote,
+              color: Colors.white70,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Motivacija dana',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          displayQuote,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: Colors.white,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '— $displayAuthor',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white60,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  // Widget _buildMotivationCard() {
+  //   if (_isLoadingQuote) {
+  //     return Container(
+  //       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+  //       padding: const EdgeInsets.all(24),
+  //       decoration: BoxDecoration(
+  //         gradient: LinearGradient(
+  //           colors: [Colors.black, Colors.grey[800]!],
+  //           begin: Alignment.topLeft,
+  //           end: Alignment.bottomRight,
+  //         ),
+  //         borderRadius: BorderRadius.circular(20),
+  //         boxShadow: [
+  //           BoxShadow(
+  //             color: Colors.black.withValues(alpha: 0.15),
+  //             blurRadius: 12,
+  //             offset: const Offset(0, 4),
+  //           ),
+  //         ],
+  //       ),
+  //       child: const Center(
+  //         child: CircularProgressIndicator(
+  //           color: Colors.white,
+  //           strokeWidth: 2,
+  //         ),
+  //       ),
+  //     );
+  //   }
+
+  //   // Fallback quote if loading failed
+  //   final displayQuote = _dailyQuote?.quote ?? 
+  //       'Uspjeh nije slučajan. To je težak rad, upornost, učenje, proučavanje, žrtva i najviše od svega, ljubav prema onome što radiš.';
+  //   final displayAuthor = _dailyQuote?.author ?? 'Unknown';
+
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+  //     padding: const EdgeInsets.all(24),
+  //     decoration: BoxDecoration(
+  //       gradient: LinearGradient(
+  //         colors: [Colors.black, Colors.grey[800]!],
+  //         begin: Alignment.topLeft,
+  //         end: Alignment.bottomRight,
+  //       ),
+  //       borderRadius: BorderRadius.circular(20),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withValues(alpha: 0.15),
+  //           blurRadius: 12,
+  //           offset: const Offset(0, 4),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Row(
+  //           children: [
+  //             Container(
+  //               padding: const EdgeInsets.all(8),
+  //               decoration: BoxDecoration(
+  //                 color: Colors.white.withValues(alpha: 0.2),
+  //                 borderRadius: BorderRadius.circular(8),
+  //               ),
+  //               child: const Icon(
+  //                 Icons.format_quote,
+  //                 color: Colors.white,
+  //                 size: 24,
+  //               ),
+  //             ),
+  //             const SizedBox(width: 12),
+  //             const Text(
+  //               'Motivacija dana',
+  //               style: TextStyle(
+  //                 fontSize: 16,
+  //                 fontWeight: FontWeight.w600,
+  //                 color: Colors.white,
+  //                 letterSpacing: 0.5,
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         const SizedBox(height: 16),
+  //         Text(
+  //           displayQuote,
+  //           style: const TextStyle(
+  //             fontSize: 15,
+  //             height: 1.5,
+  //             color: Colors.white,
+  //             fontWeight: FontWeight.w400,
+  //           ),
+  //         ),
+  //         const SizedBox(height: 12),
+  //         Align(
+  //           alignment: Alignment.centerRight,
+  //           child: Text(
+  //             '— $displayAuthor',
+  //             style: TextStyle(
+  //               fontSize: 13,
+  //               color: Colors.white.withValues(alpha: 0.8),
+  //               fontStyle: FontStyle.italic,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildDashboardGrid() {
     return Padding(
@@ -434,7 +573,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             },
           ),
           _buildDashboardCard(
-            'Pozovi trenera', 
+            'Nazovi trenera', 
             Icons.phone_outlined,
             'Kontaktiraj trenera',
             onTap: () {
