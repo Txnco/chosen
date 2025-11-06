@@ -160,19 +160,21 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title:  Text(
           'Poruke',
           style: TextStyle(
-            color: Colors.black,
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 24,
           ),
@@ -209,7 +211,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _refreshConversations,
-                  color: Colors.black,
+                  color: theme.colorScheme.onSurface,
                   child: _buildConversationsList(),
                 ),
           ),
@@ -373,6 +375,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildConversationTile(Conversation conversation) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -410,10 +414,10 @@ class _MessagingScreenState extends State<MessagingScreen> {
             Expanded(
               child: Text(
                 conversation.getDisplayName(_currentUserId),
-                style: const TextStyle(
+                style:  TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
-                  color: Colors.black,
+                  color: theme.colorScheme.onSurface,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -422,7 +426,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black,
+                  color: theme.colorScheme.onSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -468,8 +472,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
           ? Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(
-                color: Colors.black,
+              decoration:  BoxDecoration(
+                color: theme.colorScheme.onSurface,
                 shape: BoxShape.circle,
               ),
             )
@@ -487,7 +491,10 @@ class _MessagingScreenState extends State<MessagingScreen> {
         ? _userController.getProfilePictureUrl(otherUserAvatar)
         : null;
 
+    final theme = Theme.of(context);
+
     return Container(
+      
       width: 56,
       height: 56,
       decoration: BoxDecoration(
@@ -509,7 +516,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                               loadingProgress.expectedTotalBytes!
                           : null,
                       strokeWidth: 2,
-                      color: Colors.black,
+                      color: theme.colorScheme.onSurface,
                     ),
                   );
                 },
@@ -525,14 +532,15 @@ class _MessagingScreenState extends State<MessagingScreen> {
   
   Widget _buildDefaultAvatar(Conversation conversation) {
     final initials = conversation.getInitials(_currentUserId);
+    final theme = Theme.of(context);
     
     return Center(
       child: Text(
         initials,
-        style: const TextStyle(
+        style:  TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: Colors.black,
+          color: theme.colorScheme.onSurface,
         ),
       ),
     );

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:chosen/models/water_intake.dart';
 import 'package:chosen/controllers/water_controller.dart';
+import 'package:provider/provider.dart';
+import 'package:chosen/providers/theme_provider.dart';
 import 'dart:math' as math;
 
 class WaterTrackingScreen extends StatefulWidget {
@@ -175,12 +177,22 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Water Intake'),
-        content: Text('Are you sure you want to delete the ${intake.waterIntake}ml intake?'),
+        backgroundColor: Theme.of(context).cardColor,
+        title: Text(
+          'Delete Water Intake',
+          style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+        ),
+        content: Text(
+          'Are you sure you want to delete the ${intake.waterIntake}ml intake?',
+          style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -254,6 +266,11 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
   void _selectDate() async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark ||
+        (themeProvider.themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
+    
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
@@ -262,12 +279,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.black,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
+            colorScheme: ColorScheme.light(
+              primary: isDarkMode ? Colors.white : Colors.black,
+              onPrimary: isDarkMode ? Colors.black : Colors.white,
+              surface: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              onSurface: isDarkMode ? Colors.white : Colors.black,
             ),
+            dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
           ),
           child: child!,
         );
@@ -299,18 +317,10 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'Unos vode',
           style: TextStyle(
-            color: Colors.black,
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
@@ -324,18 +334,18 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            color: Colors.black,
+            color: Theme.of(context).colorScheme.primary,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Loading water data...',
             style: TextStyle(
-              color: Colors.grey,
+              color: Theme.of(context).textTheme.bodySmall?.color,
               fontSize: 16,
             ),
           ),
@@ -370,8 +380,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
       padding: const EdgeInsets.only(bottom: 20),
       child: FloatingActionButton(
         onPressed: _showAddWaterModal,
-        backgroundColor: Colors.black,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
     ) : const SizedBox.shrink();
   }
@@ -385,9 +394,11 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Theme.of(context).brightness == Brightness.dark 
+            ? const Color(0xFF2A2A2A) 
+            : Colors.grey[50],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -395,7 +406,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
           IconButton(
             onPressed: _previousDate,
             icon: const Icon(Icons.chevron_left, size: 24),
-            color: Colors.grey[700],
+            color: Theme.of(context).textTheme.bodySmall?.color,
           ),
           Expanded(
             child: GestureDetector(
@@ -405,16 +416,18 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                 children: [
                   Text(
                     _formatDate(_selectedDate),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.calendar_today, 
-                       color: Colors.grey[600], 
-                       size: 18),
+                  Icon(
+                    Icons.calendar_today, 
+                    color: Theme.of(context).textTheme.bodySmall?.color, 
+                    size: 18,
+                  ),
                 ],
               ),
             ),
@@ -422,7 +435,9 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
           IconButton(
             onPressed: canGoForward ? _nextDate : null,
             icon: const Icon(Icons.chevron_right, size: 24),
-            color: canGoForward ? Colors.grey[700] : Colors.grey[300],
+            color: canGoForward 
+                ? Theme.of(context).textTheme.bodySmall?.color 
+                : Theme.of(context).dividerColor,
           ),
         ],
       ),
@@ -447,7 +462,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
               child: CustomPaint(
                 painter: _SemiCircleProgressPainter(
                   progress: 1.0,
-                  color: Colors.grey[200]!,
+                  color: Theme.of(context).dividerColor,
                   strokeWidth: 20,
                 ),
               ),
@@ -487,17 +502,17 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                 const SizedBox(height: 8),
                 Text(
                   '${currentIntake.toInt()}ml',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
                 Text(
                   'od ${dailyGoal.toInt()}ml',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -506,7 +521,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                   '${progressPercentage.toInt()}% postignut cilj',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[500],
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
               ],
@@ -536,9 +551,16 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
   Widget _buildQuickActionButton(int amount) {
-    final isToday = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day) == 
-                   DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    
+    final isToday = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day) ==
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final secondary = theme.colorScheme.secondary;
+    final secondaryContainer = isDark
+        ? const Color(0xFF2E2E2E)
+        : secondary.withOpacity(0.05);
+
     return InkWell(
       onTap: isToday ? () => _addWaterIntake(amount.toDouble()) : null,
       borderRadius: BorderRadius.circular(16),
@@ -547,19 +569,19 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
-            color: Colors.blue[50],
+            color: secondaryContainer,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.blue[200]!),
+            border: Border.all(color: secondary.withOpacity(0.2)),
           ),
           child: Column(
             children: [
-              Icon(Icons.water_drop_outlined, color: Colors.blue[600], size: 28),
+              Icon(Icons.water_drop_outlined, color: secondary, size: 28),
               const SizedBox(height: 8),
               Text(
                 '+${amount}ml',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue[600],
+                  color: secondary,
                   fontSize: 14,
                 ),
               ),
@@ -571,12 +593,13 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
   }
 
 
+
   Widget _buildIntakeLog() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -594,17 +617,17 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
               children: [
                 Text(
                   '${_formatDate(_selectedDate)} unešeno',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
+                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -612,29 +635,31 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Colors.blue[600],
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
           if (_todayIntakes.isEmpty)
             Padding(
               padding: const EdgeInsets.all(40),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.water_drop_outlined, 
-                         size: 48, 
-                         color: Colors.grey[400]),
+                    Icon(
+                      Icons.water_drop_outlined, 
+                      size: 48, 
+                      color: Theme.of(context).iconTheme.color?.withOpacity(0.3),
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       'Nema unosa za ovaj datum',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey[500],
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                     ),
                   ],
@@ -646,7 +671,10 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _todayIntakes.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
+              separatorBuilder: (context, index) => Divider(
+                height: 1, 
+                color: Theme.of(context).dividerColor,
+              ),
               itemBuilder: (context, index) {
                 final intake = _todayIntakes[index];
                 return _buildIntakeItem(intake, index == 0);
@@ -688,17 +716,17 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
                     children: [
                       Text(
                         '${intake.waterIntake}ml',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
-                          color: Colors.black,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
                       Text(
                         _getGlassSize(intake.amount),
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).textTheme.bodySmall?.color,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -729,17 +757,17 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen>
               children: [
                 Text(
                   '${intake.timestamp.hour.toString().padLeft(2, '0')}:${intake.timestamp.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
                 Text(
                   _getTimeAgo(intake.timestamp),
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[500],
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
               ],
@@ -886,7 +914,7 @@ class _AddWaterModalState extends State<_AddWaterModal> {
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Padding(
@@ -898,17 +926,17 @@ class _AddWaterModalState extends State<_AddWaterModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Dodaj unos vode',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
-                color: Colors.black,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
             const SizedBox(height: 32),
@@ -916,22 +944,22 @@ class _AddWaterModalState extends State<_AddWaterModal> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.blue[50],
+                color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.water_drop,
                 size: 60,
-                color: Colors.blue[600],
+                color: Theme.of(context).colorScheme.secondary,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               '${_selectedAmount.toInt()}ml',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.w700,
-                color: Colors.black,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
             const SizedBox(height: 32),
@@ -954,10 +982,16 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                   onTap: widget.isLoading ? null : () => setState(() => _selectedAmount = amount),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.black : Colors.grey[100],
+                      color: isSelected 
+                          ? Theme.of(context).colorScheme.primary 
+                          : (Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[100]),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected ? Colors.black : Colors.grey[200]!,
+                        color: isSelected 
+                            ? Theme.of(context).colorScheme.primary 
+                            : Theme.of(context).dividerColor,
                         width: 2,
                       ),
                     ),
@@ -966,14 +1000,18 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                       children: [
                         Icon(
                           glassType['icon'] as IconData,
-                          color: isSelected ? Colors.white : Colors.grey[700],
+                          color: isSelected 
+                              ? Theme.of(context).colorScheme.onPrimary 
+                              : Theme.of(context).iconTheme.color?.withOpacity(0.7),
                           size: 32,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           glassType['name'] as String,
                           style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey[700],
+                            color: isSelected 
+                                ? Theme.of(context).colorScheme.onPrimary 
+                                : Theme.of(context).textTheme.bodyLarge?.color,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
@@ -982,7 +1020,9 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                         Text(
                           '${amount.toInt()}ml',
                           style: TextStyle(
-                            color: isSelected ? Colors.white70 : Colors.grey[500],
+                            color: isSelected 
+                                ? Theme.of(context).colorScheme.onPrimary.withOpacity(0.7)
+                                : Theme.of(context).textTheme.bodySmall?.color,
                             fontSize: 11,
                           ),
                         ),
@@ -1003,12 +1043,12 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      side: const BorderSide(color: Colors.black),
+                      side: BorderSide(color: Theme.of(context).colorScheme.primary),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Otkaži',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1021,25 +1061,25 @@ class _AddWaterModalState extends State<_AddWaterModal> {
                       widget.onAddWater(_selectedAmount);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: widget.isLoading 
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).colorScheme.onPrimary,
+                            ),
                           ),
                         )
                       : const Text(
                           'Dodaj',
                           style: TextStyle(
-                            color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

@@ -7,6 +7,8 @@ import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/models/events.dart';
 import 'package:chosen/models/user.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:chosen/providers/theme_provider.dart';
 
 class EventScreen extends StatefulWidget {
   const EventScreen({super.key});
@@ -17,7 +19,6 @@ class EventScreen extends StatefulWidget {
 
 class _EventScreenState extends State<EventScreen> {
   final _userController = UserController();
-  CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   Map<DateTime, List<Event>> _events = {};
@@ -44,8 +45,8 @@ class _EventScreenState extends State<EventScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final startOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
-      final endOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
+      final startOfMonth = DateTime(_selectedDay!.year, _selectedDay!.month, 1);
+      final endOfMonth = DateTime(_selectedDay!.year, _selectedDay!.month + 1, 0, 23, 59, 59);
       
       final events = await EventsController.getEvents(
         startDate: startOfMonth,
@@ -70,7 +71,7 @@ class _EventScreenState extends State<EventScreen> {
 
       setState(() {
         _events = eventMap;
-        _selectedEvents = _getEventsForDay(_selectedDay ?? _focusedDay);
+        _selectedEvents = _getEventsForDay(_selectedDay!);
         _isLoading = false;
       });
     } catch (e) {
@@ -92,19 +93,90 @@ class _EventScreenState extends State<EventScreen> {
     return _events[dateKey] ?? [];
   }
 
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    if (!isSameDay(_selectedDay, selectedDay)) {
-      setState(() {
-        _selectedDay = selectedDay;
-        _focusedDay = focusedDay;
-        _selectedEvents = _getEventsForDay(selectedDay);
-      });
+  void _previousDate() {
+    setState(() {
+      _selectedDay = _selectedDay!.subtract(const Duration(days: 1));
+      _selectedEvents = _getEventsForDay(_selectedDay!);
+    });
+    // Reload events if we move to a different month
+    if (_selectedDay!.month != _focusedDay.month) {
+      _focusedDay = _selectedDay!;
+      _loadEvents();
     }
   }
 
-  void _onPageChanged(DateTime focusedDay) {
-    _focusedDay = focusedDay;
-    _loadEvents();
+  void _nextDate() {
+    final tomorrow = _selectedDay!.add(const Duration(days: 1));
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    if (DateTime(tomorrow.year, tomorrow.month, tomorrow.day).isAfter(today)) {
+      return; // Don't allow future dates
+    }
+    
+    setState(() {
+      _selectedDay = tomorrow;
+      _selectedEvents = _getEventsForDay(_selectedDay!);
+    });
+    // Reload events if we move to a different month
+    if (_selectedDay!.month != _focusedDay.month) {
+      _focusedDay = _selectedDay!;
+      _loadEvents();
+    }
+  }
+
+  void _selectDate() async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark ||
+        (themeProvider.themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
+    
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDay!,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: isDarkMode ? Colors.white : Colors.black,
+              onPrimary: isDarkMode ? Colors.black : Colors.white,
+              surface: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              onSurface: isDarkMode ? Colors.white : Colors.black,
+            ),
+            dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          ),
+          child: child!,
+        );
+      },
+    );
+    
+    if (picked != null && picked != _selectedDay) {
+      setState(() {
+        _selectedDay = picked;
+        _selectedEvents = _getEventsForDay(_selectedDay!);
+      });
+      // Reload events if we move to a different month
+      if (_selectedDay!.month != _focusedDay.month) {
+        _focusedDay = _selectedDay!;
+        _loadEvents();
+      }
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(date.year, date.month, date.day);
+    
+    if (selectedDay == today) {
+      return 'Danas';
+    } else if (selectedDay == today.subtract(const Duration(days: 1))) {
+      return 'Jučer';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 
   Future<void> _showAddEventDialog() async {
@@ -179,15 +251,27 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Future<void> _deleteEvent(Event event) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Potvrda brisanja'),
-        content: Text('Želite li obrisati događaj "${event.title}"?'),
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        title: Text(
+          'Potvrda brisanja',
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        content: Text(
+          'Želite li obrisati događaj "${event.title}"?',
+          style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Odustani'),
+            child: Text(
+              'Odustani',
+              style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.grey),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -226,100 +310,99 @@ class _EventScreenState extends State<EventScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'Kalendar',
           style: TextStyle(
-            color: Colors.black,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black),
+            icon: const Icon(Icons.refresh),
             onPressed: _loadEvents,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddEventDialog,
-        backgroundColor: Colors.black,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.black))
-          : Column(
-              children: [
-                _buildCalendar(),
-                const Divider(height: 1),
-                Expanded(child: _buildEventList()),
-              ],
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildDateSelector(),
+                  const SizedBox(height: 24),
+                  Expanded(child: _buildEventList()),
+                ],
+              ),
             ),
     );
   }
 
-  Widget _buildCalendar() {
+  Widget _buildDateSelector() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
+    final canGoForward = selectedDay.isBefore(today);
+    
     return Container(
-      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).brightness == Brightness.dark 
+            ? const Color(0xFF2A2A2A) 
+            : Colors.grey[50],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: _previousDate,
+            icon: const Icon(Icons.chevron_left, size: 24),
+            color: Theme.of(context).textTheme.bodySmall?.color,
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: _selectDate,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _formatDate(_selectedDay!),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.calendar_today, 
+                    color: Theme.of(context).textTheme.bodySmall?.color, 
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: canGoForward ? _nextDate : null,
+            icon: const Icon(Icons.chevron_right, size: 24),
+            color: canGoForward 
+                ? Theme.of(context).textTheme.bodySmall?.color 
+                : Theme.of(context).dividerColor,
           ),
         ],
-      ),
-      child: TableCalendar(
-        firstDay: DateTime(2020),
-        lastDay: DateTime(2030),
-        focusedDay: _focusedDay,
-        selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-        calendarFormat: _calendarFormat,
-        eventLoader: _getEventsForDay,
-        startingDayOfWeek: StartingDayOfWeek.monday,
-        onDaySelected: _onDaySelected,
-        onFormatChanged: (format) {
-          setState(() {
-            _calendarFormat = format;
-          });
-        },
-        onPageChanged: _onPageChanged,
-        calendarStyle: CalendarStyle(
-          outsideDaysVisible: false,
-          selectedDecoration: const BoxDecoration(
-            color: Colors.black,
-            shape: BoxShape.circle,
-          ),
-          todayDecoration: BoxDecoration(
-            color: Colors.grey[300],
-            shape: BoxShape.circle,
-          ),
-          markerDecoration: const BoxDecoration(
-            color: Colors.blue,
-            shape: BoxShape.circle,
-          ),
-          markersMaxCount: 1,
-        ),
-        headerStyle: const HeaderStyle(
-          formatButtonVisible: false,
-          titleCentered: true,
-          titleTextStyle: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
     );
   }
@@ -330,13 +413,17 @@ class _EventScreenState extends State<EventScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: Theme.of(context).iconTheme.color?.withOpacity(0.3),
+            ),
             const SizedBox(height: 16),
             Text(
               'Nema događaja za ovaj dan',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Theme.of(context).textTheme.bodySmall?.color,
               ),
             ),
           ],
@@ -345,7 +432,7 @@ class _EventScreenState extends State<EventScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       itemCount: _selectedEvents.length,
       itemBuilder: (context, index) {
         final event = _selectedEvents[index];
@@ -357,13 +444,14 @@ class _EventScreenState extends State<EventScreen> {
   Widget _buildEventCard(Event event) {
     final timeFormat = DateFormat('HH:mm');
     final isRepeating = event.repeatType != 'none';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -374,21 +462,23 @@ class _EventScreenState extends State<EventScreen> {
       ),
       child: InkWell(
         onTap: () => _showEditEventDialog(event),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 4,
-                height: 60,
+                width: 5,
+                height: 70,
                 decoration: BoxDecoration(
-                  color: isRepeating ? Colors.purple : Colors.blue,
-                  borderRadius: BorderRadius.circular(2),
+                  color: isRepeating
+                      ? (isDark ? Colors.purple[300] : Colors.purple)
+                      : (isDark ? Colors.blue[300] : Colors.blue),
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,20 +488,23 @@ class _EventScreenState extends State<EventScreen> {
                         Expanded(
                           child: Text(
                             event.title,
-                            style: const TextStyle(
-                              fontSize: 16,
+                            style: TextStyle(
+                              fontSize: 17,
                               fontWeight: FontWeight.w600,
+                              color: Theme.of(context).textTheme.bodyLarge?.color,
                             ),
                           ),
                         ),
                         if (isRepeating)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.purple[50],
+                              color: isDark
+                                  ? Colors.purple[900]?.withOpacity(0.3)
+                                  : Colors.purple[50],
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -419,15 +512,19 @@ class _EventScreenState extends State<EventScreen> {
                               children: [
                                 Icon(
                                   Icons.repeat,
-                                  size: 12,
-                                  color: Colors.purple[700],
+                                  size: 13,
+                                  color: isDark
+                                      ? Colors.purple[300]
+                                      : Colors.purple[700],
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   _getRepeatLabel(event.repeatType),
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.purple[700],
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? Colors.purple[300]
+                                        : Colors.purple[700],
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -436,29 +533,34 @@ class _EventScreenState extends State<EventScreen> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.access_time, 
+                          size: 15, 
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                        const SizedBox(width: 6),
                         Text(
                           event.allDay
                               ? 'Cijeli dan'
                               : '${timeFormat.format(event.startTime)} - ${timeFormat.format(event.endTime)}',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                            fontSize: 13,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                           ),
                         ),
                       ],
                     ),
                     if (event.description != null && event.description!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         event.description!,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[700],
+                          fontSize: 13,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                          height: 1.4,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -467,9 +569,11 @@ class _EventScreenState extends State<EventScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
                 onPressed: () => _deleteEvent(event),
+                iconSize: 22,
               ),
             ],
           ),
@@ -563,6 +667,8 @@ class _EventDialogState extends State<_EventDialog> {
   }
 
   Future<void> _selectDate(bool isStart) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: isStart ? _startTime : _endTime,
@@ -571,7 +677,10 @@ class _EventDialogState extends State<_EventDialog> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Colors.black),
+            colorScheme: ColorScheme.light(
+              primary: isDarkMode ? Colors.white : Colors.black,
+            ),
+            dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
           ),
           child: child!,
         );
@@ -601,7 +710,9 @@ class _EventDialogState extends State<_EventDialog> {
     }
   }
 
- Future<void> _selectTime(bool isStart) async {
+  Future<void> _selectTime(bool isStart) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(isStart ? _startTime : _endTime),
@@ -610,7 +721,10 @@ class _EventDialogState extends State<_EventDialog> {
           data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
           child: Theme(
             data: Theme.of(context).copyWith(
-              colorScheme: const ColorScheme.light(primary: Colors.black),
+              colorScheme: ColorScheme.light(
+                primary: isDarkMode ? Colors.white : Colors.black,
+              ),
+              dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
             ),
             child: child!,
           ),
@@ -672,7 +786,10 @@ class _EventDialogState extends State<_EventDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Dialog(
+      backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxHeight: 600),
@@ -686,19 +803,19 @@ class _EventDialogState extends State<_EventDialog> {
               children: [
                 Text(
                   widget.event == null ? 'Novi događaj' : 'Uredi događaj',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _titleController,
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                   decoration: InputDecoration(
                     labelText: 'Naslov',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -710,20 +827,22 @@ class _EventDialogState extends State<_EventDialog> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                   decoration: InputDecoration(
                     labelText: 'Opis (opcionalno)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                   ),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 16),
                 SwitchListTile(
-                  title: const Text('Cijeli dan'),
+                  title: Text(
+                    'Cijeli dan', 
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+                  ),
                   value: _allDay,
                   onChanged: (value) => setState(() => _allDay = value),
-                  activeColor: Colors.black,
+                  activeColor: Theme.of(context).colorScheme.primary,
                   contentPadding: EdgeInsets.zero,
                 ),
                 const SizedBox(height: 8),
@@ -735,12 +854,11 @@ class _EventDialogState extends State<_EventDialog> {
                         child: InputDecorator(
                           decoration: InputDecoration(
                             labelText: 'Datum početka',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                           ),
                           child: Text(
                             DateFormat('dd.MM.yyyy').format(_startTime),
+                            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                           ),
                         ),
                       ),
@@ -753,12 +871,11 @@ class _EventDialogState extends State<_EventDialog> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: 'Vrijeme',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                              labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                             ),
                             child: Text(
                               DateFormat('HH:mm').format(_startTime),
+                              style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                             ),
                           ),
                         ),
@@ -775,12 +892,11 @@ class _EventDialogState extends State<_EventDialog> {
                         child: InputDecorator(
                           decoration: InputDecoration(
                             labelText: 'Datum završetka',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                           ),
                           child: Text(
                             DateFormat('dd.MM.yyyy').format(_endTime),
+                            style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                           ),
                         ),
                       ),
@@ -793,12 +909,11 @@ class _EventDialogState extends State<_EventDialog> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: 'Vrijeme',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                              labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                             ),
                             child: Text(
                               DateFormat('HH:mm').format(_endTime),
+                              style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                             ),
                           ),
                         ),
@@ -809,11 +924,11 @@ class _EventDialogState extends State<_EventDialog> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _repeatType,
+                  dropdownColor: Theme.of(context).cardColor,
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                   decoration: InputDecoration(
                     labelText: 'Ponavljanje',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                   ),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('Ne ponavlja se')),
@@ -838,7 +953,10 @@ class _EventDialogState extends State<_EventDialog> {
                         builder: (context, child) {
                           return Theme(
                             data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.light(primary: Colors.black),
+                              colorScheme: ColorScheme.light(
+                                primary: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
                             ),
                             child: child!,
                           );
@@ -851,12 +969,13 @@ class _EventDialogState extends State<_EventDialog> {
                     child: InputDecorator(
                       decoration: InputDecoration(
                         labelText: 'Ponavljaj do (opcionalno)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                         suffixIcon: _repeatUntil != null
                             ? IconButton(
-                                icon: const Icon(Icons.clear),
+                                icon: Icon(
+                                  Icons.clear, 
+                                  color: Theme.of(context).textTheme.bodySmall?.color,
+                                ),
                                 onPressed: () => setState(() => _repeatUntil = null),
                               )
                             : null,
@@ -865,6 +984,7 @@ class _EventDialogState extends State<_EventDialog> {
                         _repeatUntil != null
                             ? DateFormat('dd.MM.yyyy').format(_repeatUntil!)
                             : 'Odaberi datum',
+                        style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                       ),
                     ),
                   ),
@@ -875,25 +995,14 @@ class _EventDialogState extends State<_EventDialog> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         'Odustani',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                       ),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: _saveEvent,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                       child: const Text('Spremi'),
                     ),
                   ],

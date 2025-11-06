@@ -1,82 +1,99 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Light Theme
+  // ---------- BASE COLORS ----------
+  static const Color pureBlack = Color(0xFF000000);
+  static const Color softBlack = Color(0xFF121212);
+  static const Color darkGray = Color(0xFF1C1C1C);
+  static const Color darkGrayLight = Color(0xFF2A2A2A);
+  static const Color darkGrayLighter = Color(0xFF3A3A3A);
+  static const Color mediumGray = Color(0xFF7A7A7A);
+  static const Color lightGray = Color(0xFFEDEDED);
+  static const Color softGray = Color(0xFFF7F7F7);
+  static const Color white = Color(0xFFFFFFFF);
+
+  // ---------- CUSTOM COMPONENT COLORS ----------
+  // 💬 Chat bubbles
+  static const Color messageBubbleLightUser = Color(0xFFEDEDED);
+  static const Color messageBubbleLightOther = Color(0xFFF3F3F3);
+  static const Color messageBubbleDarkUser = Color(0xFF3A3A3A);
+  static const Color messageBubbleDarkOther = Color(0xFF2A2A2A);
+
+  // 🧠 Cards / Containers
+  static const Color cardLight = Colors.white;
+  static const Color cardDark = darkGray;
+  static const Color cardDarkElevated = darkGrayLight;
+
+  // ✏️ Inputs
+  static const Color inputLight = Color(0xFFF5F5F5);
+  static const Color inputDark = Color(0xFF2A2A2A);
+
+  // ✅ Accents / success / warnings
+  static const Color success = Color(0xFF4CAF50);
+  static const Color error = Color(0xFFE53935);
+  static const Color warning = Color(0xFFFFB300);
+
+  // ---------- LIGHT THEME ----------
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
     fontFamily: 'Avenir',
-    scaffoldBackgroundColor: Colors.white,
-    primaryColor: Colors.black,
-    
+    scaffoldBackgroundColor: white,
+    primaryColor: pureBlack,
+    dividerColor: Colors.grey.shade300,
+
     appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
+      backgroundColor: white,
+      foregroundColor: pureBlack,
       elevation: 0,
-      centerTitle: false,
-      iconTheme: IconThemeData(color: Colors.black),
+      centerTitle: true,
     ),
-    
+
     cardTheme: CardThemeData(
-      color: Colors.white,
+      color: cardLight,
       elevation: 2,
+      margin: EdgeInsets.zero,
+      shadowColor: Colors.black12,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
       ),
     ),
-    
-    textTheme: const TextTheme(
-      displayLarge: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-      displayMedium: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-      displaySmall: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-      headlineLarge: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-      headlineMedium: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-      headlineSmall: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-      titleLarge: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
-      titleSmall: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
-      bodyLarge: TextStyle(color: Colors.black),
-      bodyMedium: TextStyle(color: Colors.black),
-      bodySmall: TextStyle(color: Colors.black87),
-      labelLarge: TextStyle(color: Colors.black),
-      labelMedium: TextStyle(color: Colors.black),
-      labelSmall: TextStyle(color: Colors.black87),
+
+    dialogTheme: const DialogThemeData(
+      backgroundColor: white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
     ),
-    
-    colorScheme: ColorScheme.light(
-      primary: Colors.black,
-      onPrimary: Colors.white,
-      secondary: Colors.grey[800]!,
-      onSecondary: Colors.white,
-      surface: Colors.white,
-      onSurface: Colors.black,
-      error: Colors.red,
-      onError: Colors.white,
+
+    colorScheme: const ColorScheme.light(
+      primary: pureBlack,
+      onPrimary: white,
+      secondary: Colors.grey,
+      onSecondary: pureBlack,
+      surface: white,
+      onSurface: pureBlack,
+      error: error,
+      onError: white,
     ),
-    
-    iconTheme: const IconThemeData(color: Colors.black),
-    
+
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.grey[100],
+      fillColor: inputLight,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black, width: 2),
+        borderSide: const BorderSide(color: pureBlack, width: 1.5),
       ),
     ),
-    
+
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor: pureBlack,
+        foregroundColor: white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
@@ -84,89 +101,78 @@ class AppTheme {
         ),
       ),
     ),
-    
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: Colors.black,
-      foregroundColor: Colors.white,
+
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: Colors.grey.shade400),
+        foregroundColor: pureBlack,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     ),
   );
 
-  // Dark Theme
+  // ---------- DARK THEME ----------
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     fontFamily: 'Avenir',
-    scaffoldBackgroundColor: const Color(0xFF121212),
-    primaryColor: Colors.white,
-    
+    scaffoldBackgroundColor: softBlack,
+    primaryColor: white,
+    dividerColor: Colors.grey.shade800,
+
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1E1E1E),
-      foregroundColor: Colors.white,
+      backgroundColor: darkGray,
+      foregroundColor: white,
       elevation: 0,
-      centerTitle: false,
-      iconTheme: IconThemeData(color: Colors.white),
+      centerTitle: true,
     ),
-    
+
     cardTheme: CardThemeData(
-      color: const Color(0xFF1E1E1E),
+      color: cardDark,
       elevation: 2,
+      margin: EdgeInsets.zero,
+      shadowColor: Colors.black45,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
       ),
     ),
-    
-    textTheme: const TextTheme(
-      displayLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      displayMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      displaySmall: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      headlineLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      headlineMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      headlineSmall: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-      titleSmall: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-      bodyLarge: TextStyle(color: Colors.white),
-      bodyMedium: TextStyle(color: Colors.white),
-      bodySmall: TextStyle(color: Colors.white70),
-      labelLarge: TextStyle(color: Colors.white),
-      labelMedium: TextStyle(color: Colors.white),
-      labelSmall: TextStyle(color: Colors.white70),
+
+    dialogTheme: const DialogThemeData(
+      backgroundColor: darkGrayLight,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
     ),
-    
-    colorScheme: ColorScheme.dark(
-      primary: Colors.white,
-      onPrimary: Colors.black,
-      secondary: Colors.grey[300]!,
-      onSecondary: Colors.black,
-      surface: const Color(0xFF1E1E1E),
-      onSurface: Colors.white,
-      error: Colors.redAccent,
-      onError: Colors.white,
+
+    colorScheme: const ColorScheme.dark(
+      primary: white,
+      onPrimary: pureBlack,
+      secondary: mediumGray,
+      onSecondary: pureBlack,
+      surface: darkGray,
+      onSurface: white,
+      error: error,
+      onError: white,
     ),
-    
-    iconTheme: const IconThemeData(color: Colors.white),
-    
+
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF2A2A2A),
+      fillColor: inputDark,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.white, width: 2),
+        borderSide: const BorderSide(color: white, width: 1.5),
       ),
     ),
-    
+
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: darkGrayLighter,
+        foregroundColor: white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
@@ -174,21 +180,66 @@ class AppTheme {
         ),
       ),
     ),
-    
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black,
+
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: Colors.grey.shade700),
+        foregroundColor: white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     ),
   );
 
-  // Custom gradient colors for motivation card
+  // ---------- CUSTOM APP COLORS (UNIVERSAL ACCESS) ----------
+  static const Map<String, Color> lightCustom = {
+    'bubbleUser': messageBubbleLightUser,
+    'bubbleOther': messageBubbleLightOther,
+    'input': inputLight,
+    'card': cardLight,
+    'badge': Color(0xFFEEEEEE),
+  };
+
+  static const Map<String, Color> darkCustom = {
+    'bubbleUser': messageBubbleDarkUser,
+    'bubbleOther': messageBubbleDarkOther,
+    'input': inputDark,
+    'card': cardDark,
+    'badge': Color(0xFF2E2E2E),
+  };
+
+  // ---------- GRADIENTS ----------
   static List<Color> motivationGradientLight = [
-    const Color(0xFF1a1a2e),
-    const Color(0xFF16213e),
+    Color.fromARGB(255, 49, 49, 49),
+    Color.fromARGB(255, 95, 95, 95),
   ];
 
   static List<Color> motivationGradientDark = [
-    const Color(0xFF0f3460),
-    const Color(0xFF16213e),
+    Color(0xFF1F1F1F),
+    Color(0xFF121212),
   ];
+
+  // ---------- CONTEXT HELPERS ----------
+  static Color getBubbleColor(BuildContext context, {required bool isMe}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isMe
+        ? (isDark ? AppTheme.messageBubbleDarkUser : AppTheme.messageBubbleLightUser)
+        : (isDark ? AppTheme.messageBubbleDarkOther : AppTheme.messageBubbleLightOther);
+  }
+
+  static Color getInputColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? AppTheme.inputDark : AppTheme.inputLight;
+  }
+
+  static Color getCardColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? AppTheme.cardDark : AppTheme.cardLight;
+  }
+
+  static Color getBadgeColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? AppTheme.darkCustom['badge']! : AppTheme.lightCustom['badge']!;
+  }
+
 }
