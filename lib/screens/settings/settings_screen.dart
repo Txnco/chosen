@@ -4,6 +4,7 @@ import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/controllers/auth_controller.dart';
 import 'package:chosen/models/user.dart';
 import 'package:chosen/providers/theme_provider.dart';
+import 'package:chosen/providers/notification_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadNotificationSettings();
   }
 
   Future<void> _loadUserData() async {
@@ -36,6 +38,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+    await notificationProvider.loadSettings();
   }
 
   String getUserInitials() {
@@ -102,6 +109,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showNotificationsDialog() {
+    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Postavke obavještenja',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Consumer<NotificationProvider>(
+            builder: (context, provider, child) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildNotificationToggle(
+                    title: 'Planiranje dana',
+                    subtitle: 'Podsjetnik za planiranje sljedećeg dana',
+                    value: provider.dailyPlanning,
+                    onChanged: (value) => provider.setDailyPlanning(value),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildNotificationToggle(
+                    title: 'Ocjena dana',
+                    subtitle: 'Večernji podsjetnik za ocjenjivanje dana',
+                    value: provider.dayRating,
+                    onChanged: (value) => provider.setDayRating(value),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildNotificationToggle(
+                    title: 'Fotografije napretka',
+                    subtitle: 'Tjedni podsjetnik za fotografije',
+                    value: provider.progressPhoto,
+                    onChanged: (value) => provider.setProgressPhoto(value),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildNotificationToggle(
+                    title: 'Vaganje',
+                    subtitle: 'Tjedni podsjetnik za vaganje',
+                    value: provider.weight,
+                    onChanged: (value) => provider.setWeight(value),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildNotificationToggle(
+                    title: 'Unos vode',
+                    subtitle: 'Podsjetnici za piće vode',
+                    value: provider.water,
+                    onChanged: (value) => provider.setWater(value),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildNotificationToggle(
+                    title: 'Rođendan',
+                    subtitle: 'Čestitka na rođendan',
+                    value: provider.birthday,
+                    onChanged: (value) => provider.setBirthday(value, _user),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationToggle({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required Function(bool) onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Theme.of(context).dividerColor,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: Theme.of(context).colorScheme.primary,
+          ),
+        ],
       ),
     );
   }
@@ -367,14 +500,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.notifications_outlined,
             title: 'Obavještenja',
             subtitle: 'Upravljanje obavještenjima',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Postavke obavještenja će biti dostupne uskoro'),
-                  backgroundColor: Colors.blue,
-                ),
-              );
-            },
+            onTap: () => _showNotificationsDialog(),
           ),
           _buildDivider(),
           _buildSettingsItem(
