@@ -565,6 +565,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.info_outline,
+            title: 'NOTIFIKACIJE',
+            subtitle: 'DEBUG',
+            onTap: () => Navigator.pushNamed(context, '/notification-test'),
+          ),
         ],
       ),
     );

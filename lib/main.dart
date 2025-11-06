@@ -14,6 +14,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/tracking/weight_tracking_screen.dart';
 import 'screens/events/event_screen.dart';
+import 'screens/testing/notification_test_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +62,7 @@ class MyApp extends StatelessWidget {
             '/profile': (context) => const ProfileScreen(),
             '/weight-tracking': (_) => const WeightTrackingScreen(),
             '/events': (context) => const EventScreen(),
+            '/notification-test': (_) => const NotificationTestScreen(),
           },
 
           onUnknownRoute: (_) => MaterialPageRoute(
