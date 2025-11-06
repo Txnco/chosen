@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'providers/notification_provider.dart';
+import 'controllers/notifications_controller.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/questionnaire/questionnaire_screen.dart';
@@ -12,11 +14,20 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/tracking/weight_tracking_screen.dart';
 import 'screens/events/event_screen.dart';
+import 'screens/testing/notification_test_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize notifications
+  await NotificationsController.initialize();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -51,6 +62,7 @@ class MyApp extends StatelessWidget {
             '/profile': (context) => const ProfileScreen(),
             '/weight-tracking': (_) => const WeightTrackingScreen(),
             '/events': (context) => const EventScreen(),
+            '/notification-test': (_) => const NotificationTestScreen(),
           },
 
           onUnknownRoute: (_) => MaterialPageRoute(

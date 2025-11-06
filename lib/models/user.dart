@@ -4,7 +4,8 @@ class UserModel {
   final String firstName;
   final String lastName;
   final int roleId;
-  final String? profilePicture; 
+  final String? profilePicture;
+  final DateTime? birthdate;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -14,7 +15,8 @@ class UserModel {
     required this.firstName,
     required this.lastName,
     required this.roleId,
-    this.profilePicture,  
+    this.profilePicture,
+    this.birthdate,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -27,6 +29,7 @@ class UserModel {
       lastName: json['last_name'] ?? '',
       roleId: json['role_id'] ?? '',
       profilePicture: json['profile_picture'],
+      birthdate: json['birthdate'] != null ? DateTime.parse(json['birthdate']) : null,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : DateTime.now(),
     );
@@ -38,6 +41,7 @@ class UserModel {
     'first_name': firstName,
     'last_name': lastName,
     'role_id': roleId,
-    'profile_picture': profilePicture,  
+    'profile_picture': profilePicture,
+    'birthdate': birthdate?.toIso8601String(),
   };
 }
