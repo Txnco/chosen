@@ -42,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadNotificationSettings() async {
     final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
-    await notificationProvider.loadSettings();
+    await notificationProvider.loadSettings(user: _user);
   }
 
   String getUserInitials() {
@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -132,6 +132,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         content: SingleChildScrollView(
           child: Consumer<NotificationProvider>(
             builder: (context, provider, child) {
+              // Show error snackbar if there's an error
+              if (provider.errorMessage != null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(provider.errorMessage!),
+                      backgroundColor: Colors.red[600],
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  provider.clearError();
+                });
+              }
+
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -139,42 +153,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Planiranje dana',
                     subtitle: 'Podsjetnik za planiranje sljedećeg dana',
                     value: provider.dailyPlanning,
-                    onChanged: (value) => provider.setDailyPlanning(value),
+                    onChanged: (value) async {
+                      final success = await provider.setDailyPlanning(value);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
+                            backgroundColor: Colors.red[600],
+                          ),
+                        );
+                        provider.clearError();
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Ocjena dana',
                     subtitle: 'Večernji podsjetnik za ocjenjivanje dana',
                     value: provider.dayRating,
-                    onChanged: (value) => provider.setDayRating(value),
+                    onChanged: (value) async {
+                      final success = await provider.setDayRating(value);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
+                            backgroundColor: Colors.red[600],
+                          ),
+                        );
+                        provider.clearError();
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Fotografije napretka',
                     subtitle: 'Tjedni podsjetnik za fotografije',
                     value: provider.progressPhoto,
-                    onChanged: (value) => provider.setProgressPhoto(value),
+                    onChanged: (value) async {
+                      final success = await provider.setProgressPhoto(value);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
+                            backgroundColor: Colors.red[600],
+                          ),
+                        );
+                        provider.clearError();
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Vaganje',
                     subtitle: 'Tjedni podsjetnik za vaganje',
                     value: provider.weight,
-                    onChanged: (value) => provider.setWeight(value),
+                    onChanged: (value) async {
+                      final success = await provider.setWeight(value);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
+                            backgroundColor: Colors.red[600],
+                          ),
+                        );
+                        provider.clearError();
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Unos vode',
                     subtitle: 'Podsjetnici za piće vode',
                     value: provider.water,
-                    onChanged: (value) => provider.setWater(value),
+                    onChanged: (value) async {
+                      final success = await provider.setWater(value);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
+                            backgroundColor: Colors.red[600],
+                          ),
+                        );
+                        provider.clearError();
+                      }
+                    },
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Rođendan',
                     subtitle: 'Čestitka na rođendan',
                     value: provider.birthday,
-                    onChanged: (value) => provider.setBirthday(value, _user),
+                    onChanged: (value) async {
+                      final success = await provider.setBirthday(value, _user);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
+                            backgroundColor: Colors.red[600],
+                          ),
+                        );
+                        provider.clearError();
+                      }
+                    },
                   ),
                 ],
               );
@@ -183,7 +263,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Zatvori'),
           ),
         ],
@@ -195,7 +275,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
-    required Function(bool) onChanged,
+    required void Function(bool) onChanged,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),

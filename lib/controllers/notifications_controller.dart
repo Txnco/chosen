@@ -3,6 +3,9 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chosen/models/user.dart';
+import 'package:chosen/models/notification_preferences.dart';
+import 'package:chosen/utils/chosen_api.dart';
+import 'dart:convert';
 
 class NotificationsController {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -425,5 +428,132 @@ class NotificationsController {
     await prefs.setBool('notification_weight', false);
     await prefs.setBool('notification_water', false);
     await prefs.setBool('notification_birthday', false);
+  }
+
+  // ============== API Integration Methods ==============
+
+  /// Fetch notification preferences from the backend
+  static Future<NotificationPreferences?> fetchPreferencesFromApi() async {
+    try {
+      final response = await ChosenApi.get('/notifications/preferences');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return NotificationPreferences.fromJson(data);
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid - return null to trigger login
+        print('Authentication failed - token may be expired');
+        return null;
+      } else {
+        print('Failed to fetch preferences: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching preferences from API: $e');
+      return null;
+    }
+  }
+
+  /// Update notification preferences on the backend
+  static Future<bool> updatePreferencesToApi(NotificationPreferences preferences) async {
+    try {
+      final response = await ChosenApi.put(
+        '/notifications/preferences',
+        preferences.toJson(),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else if (response.statusCode == 401) {
+        print('Authentication failed - token may be expired');
+        return false;
+      } else {
+        print('Failed to update preferences: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Error updating preferences to API: $e');
+      return false;
+    }
+  }
+
+  /// Reset notification preferences to defaults on the backend
+  static Future<bool> resetPreferencesOnApi() async {
+    try {
+      final response = await ChosenApi.post('/notifications/reset', {});
+
+      if (response.statusCode == 200) {
+        return true;
+      } else if (response.statusCode == 401) {
+        print('Authentication failed - token may be expired');
+        return false;
+      } else {
+        print('Failed to reset preferences: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('Error resetting preferences on API: $e');
+      return false;
+    }
+  }
+
+  /// Sync local preferences with backend and reschedule notifications
+  static Future<void> syncPreferencesWithApi(UserModel? user) async {
+    final apiPreferences = await fetchPreferencesFromApi();
+
+    if (apiPreferences != null) {
+      // Update local SharedPreferences to match backend
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setBool('notification_daily_planning', apiPreferences.dailyPlanning.enabled);
+      await prefs.setBool('notification_day_rating', apiPreferences.dayRating.enabled);
+      await prefs.setBool('notification_progress_photo', apiPreferences.progressPhoto.enabled);
+      await prefs.setBool('notification_weight', apiPreferences.weightTracking.enabled);
+      await prefs.setBool('notification_water', apiPreferences.waterReminders.enabled);
+      await prefs.setBool('notification_birthday', apiPreferences.birthday.enabled);
+
+      if (apiPreferences.waterReminders.intervalHours != null) {
+        await prefs.setInt('notification_water_interval', apiPreferences.waterReminders.intervalHours!);
+      }
+
+      // Reschedule all notifications based on synced preferences
+      await rescheduleAllNotifications(user);
+    }
+  }
+
+  /// Convert current local settings to NotificationPreferences object
+  static Future<NotificationPreferences> getCurrentPreferences() async {
+    final settings = await getNotificationSettings();
+    final prefs = await SharedPreferences.getInstance();
+    final waterInterval = prefs.getInt('notification_water_interval') ?? 2;
+
+    return NotificationPreferences(
+      dailyPlanning: NotificationPreference(
+        enabled: settings['daily_planning'] ?? false,
+        time: '20:00',
+      ),
+      dayRating: NotificationPreference(
+        enabled: settings['day_rating'] ?? false,
+        time: '20:00',
+      ),
+      progressPhoto: NotificationPreference(
+        enabled: settings['progress_photo'] ?? false,
+        day: 1,
+        time: '09:00',
+      ),
+      weightTracking: NotificationPreference(
+        enabled: settings['weight'] ?? false,
+        day: 1,
+        time: '08:00',
+      ),
+      waterReminders: NotificationPreference(
+        enabled: settings['water'] ?? false,
+        intervalHours: waterInterval,
+      ),
+      birthday: NotificationPreference(
+        enabled: settings['birthday'] ?? false,
+        time: '09:00',
+      ),
+    );
   }
 }
