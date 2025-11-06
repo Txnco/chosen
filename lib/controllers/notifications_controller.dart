@@ -538,12 +538,12 @@ class NotificationsController {
       ),
       progressPhoto: NotificationPreference(
         enabled: settings['progress_photo'] ?? false,
-        day: 1,
+        day: 'monday',  // Changed from 1
         time: '09:00',
       ),
       weightTracking: NotificationPreference(
         enabled: settings['weight'] ?? false,
-        day: 1,
+        day: 'monday',  // Changed from 1
         time: '08:00',
       ),
       waterReminders: NotificationPreference(

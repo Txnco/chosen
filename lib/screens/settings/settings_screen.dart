@@ -149,55 +149,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Planiranje dana',
                     subtitle: 'Podsjetnik za planiranje sljedećeg dana',
                     value: provider.dailyPlanning,
-                    onChanged: (value) async {
-                      await provider.setDailyPlanning(value);
-                    },
+                    onChanged: (value) => provider.setDailyPlanning(value),
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Ocjena dana',
                     subtitle: 'Večernji podsjetnik za ocjenjivanje dana',
                     value: provider.dayRating,
-                    onChanged: (value) async {
-                      await provider.setDayRating(value);
-                    },
+                    onChanged: (value) => provider.setDayRating(value),
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Fotografije napretka',
                     subtitle: 'Tjedni podsjetnik za fotografije',
                     value: provider.progressPhoto,
-                    onChanged: (value) async {
-                      await provider.setProgressPhoto(value);
-                    },
+                    onChanged: (value) => provider.setProgressPhoto(value),
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Vaganje',
                     subtitle: 'Tjedni podsjetnik za vaganje',
                     value: provider.weight,
-                    onChanged: (value) async {
-                      await provider.setWeight(value);
-                    },
+                    onChanged: (value) => provider.setWeight(value),
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Unos vode',
                     subtitle: 'Podsjetnici za piće vode',
                     value: provider.water,
-                    onChanged: (value) async {
-                      await provider.setWater(value);
-                    },
+                    onChanged: (value) => provider.setWater(value),
                   ),
                   const SizedBox(height: 8),
                   _buildNotificationToggle(
                     title: 'Rođendan',
                     subtitle: 'Čestitka na rođendan',
                     value: provider.birthday,
-                    onChanged: (value) async {
-                      await provider.setBirthday(value, _user);
-                    },
+                    onChanged: (value) => provider.setBirthday(value, _user),
                   ),
+                  
+                  // Error message display
+                  if (provider.errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              provider.errorMessage!,
+                              style: TextStyle(
+                                color: Colors.red[900],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close, size: 16, color: Colors.red[700]),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => provider.clearError(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               );
             },
@@ -205,7 +227,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () {
+              // Clear any errors before closing
+              final provider = Provider.of<NotificationProvider>(context, listen: false);
+              provider.clearError();
+              Navigator.pop(dialogContext);
+            },
             child: const Text('Zatvori'),
           ),
         ],
@@ -217,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
-    required Future<void> Function(bool) onChanged,
+    required Future<bool> Function(bool) onChanged,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),

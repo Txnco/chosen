@@ -59,8 +59,8 @@ class NotificationProvider extends ChangeNotifier {
     return NotificationPreferences(
       dailyPlanning: NotificationPreference(enabled: _dailyPlanning, time: '20:00'),
       dayRating: NotificationPreference(enabled: _dayRating, time: '20:00'),
-      progressPhoto: NotificationPreference(enabled: _progressPhoto, day: 1, time: '09:00'),
-      weightTracking: NotificationPreference(enabled: _weight, day: 1, time: '08:00'),
+      progressPhoto: NotificationPreference(enabled: _progressPhoto, day: 'monday', time: '09:00'),  // Changed from 1
+      weightTracking: NotificationPreference(enabled: _weight, day: 'monday', time: '08:00'),  // Changed from 1
       waterReminders: NotificationPreference(enabled: _water, intervalHours: 2),
       birthday: NotificationPreference(enabled: _birthday, time: '09:00'),
     );

@@ -1,7 +1,7 @@
 class NotificationPreference {
   final bool enabled;
   final String? time;
-  final int? day;
+  final String? day;
   final int? intervalHours;
   final String? birthdayDate;
 
@@ -17,7 +17,7 @@ class NotificationPreference {
     return NotificationPreference(
       enabled: json['enabled'] ?? false,
       time: json['time'],
-      day: json['day'] is String ? _parseDayString(json['day']) : json['day'],
+      day: json['day']?.toString().toLowerCase(),
       intervalHours: json['interval_hours'],
       birthdayDate: json['birthday_date'],
     );
@@ -35,7 +35,7 @@ class NotificationPreference {
       'enabled': enabled,
     };
     if (time != null) data['time'] = time;
-    if (day != null) data['day'] = day;
+    if (day != null) data['day'] = day; 
     if (intervalHours != null) data['interval_hours'] = intervalHours;
     return data;
   }
@@ -98,8 +98,8 @@ class NotificationPreferences {
     return NotificationPreferences(
       dailyPlanning: NotificationPreference(enabled: true, time: '20:00'),
       dayRating: NotificationPreference(enabled: true, time: '20:00'),
-      progressPhoto: NotificationPreference(enabled: true, day: 1, time: '09:00'),
-      weightTracking: NotificationPreference(enabled: true, day: 1, time: '08:00'),
+      progressPhoto: NotificationPreference(enabled: true, day: 'monday', time: '09:00'),  // Changed from 1
+      weightTracking: NotificationPreference(enabled: true, day: 'monday', time: '08:00'),  // Changed from 1
       waterReminders: NotificationPreference(enabled: true, intervalHours: 2),
       birthday: NotificationPreference(enabled: true, time: '09:00'),
     );
