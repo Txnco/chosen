@@ -1,325 +1,198 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:chosen/controllers/notifications_controller.dart';
-import 'package:chosen/models/user.dart';
 import 'package:chosen/models/notification_preferences.dart';
+import 'package:chosen/models/user.dart';
 
 class NotificationProvider extends ChangeNotifier {
-  bool _dailyPlanning = false;
-  bool _dayRating = false;
-  bool _progressPhoto = false;
-  bool _weight = false;
-  bool _water = false;
-  bool _birthday = false;
-  int _waterInterval = 2;
-  bool _isLoading = false;
+  bool _dailyPlanning = true;
+  bool _dayRating = true;
+  bool _progressPhoto = true;
+  bool _weight = true;
+  bool _water = true;
+  bool _birthday = true;
+  
   String? _errorMessage;
+  bool _isLoading = false;
 
+  // Getters
   bool get dailyPlanning => _dailyPlanning;
   bool get dayRating => _dayRating;
   bool get progressPhoto => _progressPhoto;
   bool get weight => _weight;
   bool get water => _water;
   bool get birthday => _birthday;
-  int get waterInterval => _waterInterval;
-  bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isLoading => _isLoading;
 
-  // Load notification settings from backend API (with fallback to local)
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Load settings from backend API
   Future<void> loadSettings({UserModel? user}) async {
     _isLoading = true;
-    _errorMessage = null;
     notifyListeners();
 
     try {
-      // Try to fetch from backend first
-      final apiPreferences = await NotificationsController.fetchPreferencesFromApi();
-
-      if (apiPreferences != null) {
-        // Successfully fetched from API, update local state
-        _dailyPlanning = apiPreferences.dailyPlanning.enabled;
-        _dayRating = apiPreferences.dayRating.enabled;
-        _progressPhoto = apiPreferences.progressPhoto.enabled;
-        _weight = apiPreferences.weightTracking.enabled;
-        _water = apiPreferences.waterReminders.enabled;
-        _birthday = apiPreferences.birthday.enabled;
-        _waterInterval = apiPreferences.waterReminders.intervalHours ?? 2;
-
-        // Sync local preferences and reschedule notifications
-        await NotificationsController.syncPreferencesWithApi(user);
-      } else {
-        // Fallback to local SharedPreferences if API fails (offline mode)
-        final settings = await NotificationsController.getNotificationSettings();
-        _dailyPlanning = settings['daily_planning'] ?? false;
-        _dayRating = settings['day_rating'] ?? false;
-        _progressPhoto = settings['progress_photo'] ?? false;
-        _weight = settings['weight'] ?? false;
-        _water = settings['water'] ?? false;
-        _birthday = settings['birthday'] ?? false;
+      final prefs = await NotificationsController.fetchPreferencesFromApi();
+      
+      if (prefs != null) {
+        _dailyPlanning = prefs.dailyPlanning.enabled;
+        _dayRating = prefs.dayRating.enabled;
+        _progressPhoto = prefs.progressPhoto.enabled;
+        _weight = prefs.weightTracking.enabled;
+        _water = prefs.waterReminders.enabled;
+        _birthday = prefs.birthday.enabled;
       }
     } catch (e) {
-      // If any error, fallback to local settings
-      final settings = await NotificationsController.getNotificationSettings();
-      _dailyPlanning = settings['daily_planning'] ?? false;
-      _dayRating = settings['day_rating'] ?? false;
-      _progressPhoto = settings['progress_photo'] ?? false;
-      _weight = settings['weight'] ?? false;
-      _water = settings['water'] ?? false;
-      _birthday = settings['birthday'] ?? false;
-
-      _errorMessage = 'Could not sync with server. Using local settings.';
+      print('Error loading notification settings: $e');
+      _errorMessage = 'Greška pri učitavanju postavki';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
-  // Toggle daily planning notification
+  /// Build NotificationPreferences from current provider state
+  NotificationPreferences _buildCurrentPreferences() {
+    return NotificationPreferences(
+      dailyPlanning: NotificationPreference(enabled: _dailyPlanning, time: '20:00'),
+      dayRating: NotificationPreference(enabled: _dayRating, time: '20:00'),
+      progressPhoto: NotificationPreference(enabled: _progressPhoto, day: 1, time: '09:00'),
+      weightTracking: NotificationPreference(enabled: _weight, day: 1, time: '08:00'),
+      waterReminders: NotificationPreference(enabled: _water, intervalHours: 2),
+      birthday: NotificationPreference(enabled: _birthday, time: '09:00'),
+    );
+  }
+
+  /// Push current state to API
+  Future<bool> _pushCurrentStateToApi() async {
+    final prefs = _buildCurrentPreferences();
+    return await NotificationsController.updatePreferencesToApi(prefs);
+  }
+
+  /// Set daily planning notification
   Future<bool> setDailyPlanning(bool value) async {
-    final oldValue = _dailyPlanning;
+    final old = _dailyPlanning;
     _dailyPlanning = value;
     notifyListeners();
 
-    // Schedule/cancel local notification
-    await NotificationsController.scheduleDailyPlanningReminder(enabled: value);
-
-    // Update backend
-    final preferences = await NotificationsController.getCurrentPreferences();
-    final updatedPreferences = NotificationPreferences(
-      dailyPlanning: NotificationPreference(enabled: value, time: preferences.dailyPlanning.time),
-      dayRating: preferences.dayRating,
-      progressPhoto: preferences.progressPhoto,
-      weightTracking: preferences.weightTracking,
-      waterReminders: preferences.waterReminders,
-      birthday: preferences.birthday,
-    );
-
-    final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
+    final success = await _pushCurrentStateToApi();
     if (!success) {
-      // Revert on failure
-      _dailyPlanning = oldValue;
+      _dailyPlanning = old;
+      _errorMessage = 'Neuspjelo spremanje postavke';
       notifyListeners();
-      _errorMessage = 'Could not update notifications. Please check your connection.';
       return false;
     }
 
+    await NotificationsController.scheduleDailyPlanningReminder(enabled: value);
     return true;
   }
 
-  // Toggle day rating notification
+  /// Set day rating notification
   Future<bool> setDayRating(bool value) async {
-    final oldValue = _dayRating;
+    final old = _dayRating;
     _dayRating = value;
     notifyListeners();
 
-    await NotificationsController.scheduleDayRatingReminder(enabled: value);
-
-    final preferences = await NotificationsController.getCurrentPreferences();
-    final updatedPreferences = NotificationPreferences(
-      dailyPlanning: preferences.dailyPlanning,
-      dayRating: NotificationPreference(enabled: value, time: preferences.dayRating.time),
-      progressPhoto: preferences.progressPhoto,
-      weightTracking: preferences.weightTracking,
-      waterReminders: preferences.waterReminders,
-      birthday: preferences.birthday,
-    );
-
-    final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
+    final success = await _pushCurrentStateToApi();
     if (!success) {
-      _dayRating = oldValue;
+      _dayRating = old;
+      _errorMessage = 'Neuspjelo spremanje postavke';
       notifyListeners();
-      _errorMessage = 'Could not update notifications. Please check your connection.';
       return false;
     }
 
+    await NotificationsController.scheduleDayRatingReminder(enabled: value);
     return true;
   }
 
-  // Toggle progress photo notification
+  /// Set progress photo notification
   Future<bool> setProgressPhoto(bool value) async {
-    final oldValue = _progressPhoto;
+    final old = _progressPhoto;
     _progressPhoto = value;
     notifyListeners();
 
-    await NotificationsController.scheduleWeeklyProgressPhotoReminder(enabled: value);
-
-    final preferences = await NotificationsController.getCurrentPreferences();
-    final updatedPreferences = NotificationPreferences(
-      dailyPlanning: preferences.dailyPlanning,
-      dayRating: preferences.dayRating,
-      progressPhoto: NotificationPreference(
-        enabled: value,
-        day: preferences.progressPhoto.day,
-        time: preferences.progressPhoto.time,
-      ),
-      weightTracking: preferences.weightTracking,
-      waterReminders: preferences.waterReminders,
-      birthday: preferences.birthday,
-    );
-
-    final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
+    final success = await _pushCurrentStateToApi();
     if (!success) {
-      _progressPhoto = oldValue;
+      _progressPhoto = old;
+      _errorMessage = 'Neuspjelo spremanje postavke';
       notifyListeners();
-      _errorMessage = 'Could not update notifications. Please check your connection.';
       return false;
     }
 
+    await NotificationsController.scheduleWeeklyProgressPhotoReminder(enabled: value);
     return true;
   }
 
-  // Toggle weight tracking notification
+  /// Set weight tracking notification
   Future<bool> setWeight(bool value) async {
-    final oldValue = _weight;
+    final old = _weight;
     _weight = value;
     notifyListeners();
 
+    final success = await _pushCurrentStateToApi();
+    if (!success) {
+      _weight = old;
+      _errorMessage = 'Neuspjelo spremanje postavke';
+      notifyListeners();
+      return false;
+    }
+
     await NotificationsController.scheduleWeeklyWeightReminder(enabled: value);
-
-    final preferences = await NotificationsController.getCurrentPreferences();
-    final updatedPreferences = NotificationPreferences(
-      dailyPlanning: preferences.dailyPlanning,
-      dayRating: preferences.dayRating,
-      progressPhoto: preferences.progressPhoto,
-      weightTracking: NotificationPreference(
-        enabled: value,
-        day: preferences.weightTracking.day,
-        time: preferences.weightTracking.time,
-      ),
-      waterReminders: preferences.waterReminders,
-      birthday: preferences.birthday,
-    );
-
-    final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
-    if (!success) {
-      _weight = oldValue;
-      notifyListeners();
-      _errorMessage = 'Could not update notifications. Please check your connection.';
-      return false;
-    }
-
     return true;
   }
 
-  // Toggle water reminder notification
-  Future<bool> setWater(bool value, {int? intervalHours}) async {
-    final oldValue = _water;
-    final oldInterval = _waterInterval;
-
+  /// Set water reminder notification
+  Future<bool> setWater(bool value) async {
+    final old = _water;
     _water = value;
-    if (intervalHours != null) {
-      _waterInterval = intervalHours;
-    }
     notifyListeners();
 
-    await NotificationsController.scheduleWaterReminders(
-      enabled: value,
-      intervalHours: _waterInterval,
-    );
-
-    final preferences = await NotificationsController.getCurrentPreferences();
-    final updatedPreferences = NotificationPreferences(
-      dailyPlanning: preferences.dailyPlanning,
-      dayRating: preferences.dayRating,
-      progressPhoto: preferences.progressPhoto,
-      weightTracking: preferences.weightTracking,
-      waterReminders: NotificationPreference(
-        enabled: value,
-        intervalHours: _waterInterval,
-      ),
-      birthday: preferences.birthday,
-    );
-
-    final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
+    final success = await _pushCurrentStateToApi();
     if (!success) {
-      _water = oldValue;
-      _waterInterval = oldInterval;
+      _water = old;
+      _errorMessage = 'Neuspjelo spremanje postavke';
       notifyListeners();
-      _errorMessage = 'Could not update notifications. Please check your connection.';
       return false;
     }
 
+    await NotificationsController.scheduleWaterReminders(enabled: value, intervalHours: 2);
     return true;
   }
 
-  // Set water interval
-  Future<bool> setWaterInterval(int hours) async {
-    final oldInterval = _waterInterval;
-    _waterInterval = hours;
-    notifyListeners();
-
-    if (_water) {
-      await NotificationsController.scheduleWaterReminders(
-        enabled: true,
-        intervalHours: hours,
-      );
-
-      final preferences = await NotificationsController.getCurrentPreferences();
-      final updatedPreferences = NotificationPreferences(
-        dailyPlanning: preferences.dailyPlanning,
-        dayRating: preferences.dayRating,
-        progressPhoto: preferences.progressPhoto,
-        weightTracking: preferences.weightTracking,
-        waterReminders: NotificationPreference(
-          enabled: true,
-          intervalHours: hours,
-        ),
-        birthday: preferences.birthday,
-      );
-
-      final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
-      if (!success) {
-        _waterInterval = oldInterval;
-        notifyListeners();
-        _errorMessage = 'Could not update notifications. Please check your connection.';
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  // Toggle birthday notification
+  /// Set birthday notification
   Future<bool> setBirthday(bool value, UserModel? user) async {
-    final oldValue = _birthday;
+    final old = _birthday;
     _birthday = value;
     notifyListeners();
+
+    final success = await _pushCurrentStateToApi();
+    if (!success) {
+      _birthday = old;
+      _errorMessage = 'Neuspjelo spremanje postavke';
+      notifyListeners();
+      return false;
+    }
 
     await NotificationsController.scheduleBirthdayNotification(
       enabled: value,
       user: user,
     );
-
-    final preferences = await NotificationsController.getCurrentPreferences();
-    final updatedPreferences = NotificationPreferences(
-      dailyPlanning: preferences.dailyPlanning,
-      dayRating: preferences.dayRating,
-      progressPhoto: preferences.progressPhoto,
-      weightTracking: preferences.weightTracking,
-      waterReminders: preferences.waterReminders,
-      birthday: NotificationPreference(enabled: value, time: preferences.birthday.time),
-    );
-
-    final success = await NotificationsController.updatePreferencesToApi(updatedPreferences);
-
-    if (!success) {
-      _birthday = oldValue;
-      notifyListeners();
-      _errorMessage = 'Could not update notifications. Please check your connection.';
-      return false;
-    }
-
     return true;
   }
 
-  // Enable all notifications
-  Future<void> enableAll(UserModel? user) async {
+  /// Reset all notifications to defaults
+  Future<bool> resetToDefaults(UserModel? user) async {
+    final oldDailyPlanning = _dailyPlanning;
+    final oldDayRating = _dayRating;
+    final oldProgressPhoto = _progressPhoto;
+    final oldWeight = _weight;
+    final oldWater = _water;
+    final oldBirthday = _birthday;
+
+    // Set all to true (defaults)
     _dailyPlanning = true;
     _dayRating = true;
     _progressPhoto = true;
@@ -328,54 +201,22 @@ class NotificationProvider extends ChangeNotifier {
     _birthday = true;
     notifyListeners();
 
-    await NotificationsController.rescheduleAllNotifications(user);
-
-    // Update backend
-    final preferences = await NotificationsController.getCurrentPreferences();
-    await NotificationsController.updatePreferencesToApi(preferences);
-  }
-
-  // Disable all notifications
-  Future<void> disableAll() async {
-    _dailyPlanning = false;
-    _dayRating = false;
-    _progressPhoto = false;
-    _weight = false;
-    _water = false;
-    _birthday = false;
-    notifyListeners();
-
-    await NotificationsController.cancelAllNotifications();
-
-    // Update backend
-    final preferences = await NotificationsController.getCurrentPreferences();
-    await NotificationsController.updatePreferencesToApi(preferences);
-  }
-
-  // Reset preferences to defaults
-  Future<bool> resetToDefaults(UserModel? user) async {
-    _isLoading = true;
-    notifyListeners();
-
     final success = await NotificationsController.resetPreferencesOnApi();
-
-    if (success) {
-      // Reload from backend to get defaults
-      await loadSettings(user: user);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } else {
-      _isLoading = false;
-      _errorMessage = 'Could not reset preferences. Please check your connection.';
+    if (!success) {
+      // Revert all
+      _dailyPlanning = oldDailyPlanning;
+      _dayRating = oldDayRating;
+      _progressPhoto = oldProgressPhoto;
+      _weight = oldWeight;
+      _water = oldWater;
+      _birthday = oldBirthday;
+      _errorMessage = 'Neuspjelo resetiranje postavki';
       notifyListeners();
       return false;
     }
-  }
 
-  // Clear error message
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
+    // Reschedule all notifications
+    await NotificationsController.rescheduleAllNotifications(user);
+    return true;
   }
 }

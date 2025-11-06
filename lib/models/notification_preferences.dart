@@ -3,21 +3,31 @@ class NotificationPreference {
   final String? time;
   final int? day;
   final int? intervalHours;
+  final String? birthdayDate;
 
   NotificationPreference({
     required this.enabled,
     this.time,
     this.day,
     this.intervalHours,
+    this.birthdayDate,
   });
 
   factory NotificationPreference.fromJson(Map<String, dynamic> json) {
     return NotificationPreference(
       enabled: json['enabled'] ?? false,
       time: json['time'],
-      day: json['day'],
+      day: json['day'] is String ? _parseDayString(json['day']) : json['day'],
       intervalHours: json['interval_hours'],
+      birthdayDate: json['birthday_date'],
     );
+  }
+
+  static int? _parseDayString(String? day) {
+    if (day == null) return null;
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    final index = days.indexOf(day.toLowerCase());
+    return index >= 0 ? index + 1 : 1;
   }
 
   Map<String, dynamic> toJson() {
@@ -49,24 +59,26 @@ class NotificationPreferences {
   });
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
+    final notifications = json['notifications'] ?? json;
+    
     return NotificationPreferences(
       dailyPlanning: NotificationPreference.fromJson(
-        json['daily_planning'] ?? {'enabled': false, 'time': '20:00'},
+        notifications['daily_planning'] ?? {'enabled': true, 'time': '20:00'},
       ),
       dayRating: NotificationPreference.fromJson(
-        json['day_rating'] ?? {'enabled': false, 'time': '20:00'},
+        notifications['day_rating'] ?? {'enabled': true, 'time': '20:00'},
       ),
       progressPhoto: NotificationPreference.fromJson(
-        json['progress_photo'] ?? {'enabled': false, 'day': 1, 'time': '09:00'},
+        notifications['progress_photo'] ?? {'enabled': true, 'day': 1, 'time': '09:00'},
       ),
       weightTracking: NotificationPreference.fromJson(
-        json['weight_tracking'] ?? {'enabled': false, 'day': 1, 'time': '08:00'},
+        notifications['weight_tracking'] ?? {'enabled': true, 'day': 1, 'time': '08:00'},
       ),
       waterReminders: NotificationPreference.fromJson(
-        json['water_reminders'] ?? {'enabled': false, 'interval_hours': 2},
+        notifications['water_reminders'] ?? {'enabled': true, 'interval_hours': 2},
       ),
       birthday: NotificationPreference.fromJson(
-        json['birthday'] ?? {'enabled': false, 'time': '09:00'},
+        notifications['birthday'] ?? {'enabled': true, 'time': '09:00'},
       ),
     );
   }
@@ -82,15 +94,14 @@ class NotificationPreferences {
     };
   }
 
-  // Helper method to get defaults
   factory NotificationPreferences.defaults() {
     return NotificationPreferences(
-      dailyPlanning: NotificationPreference(enabled: false, time: '20:00'),
-      dayRating: NotificationPreference(enabled: false, time: '20:00'),
-      progressPhoto: NotificationPreference(enabled: false, day: 1, time: '09:00'),
-      weightTracking: NotificationPreference(enabled: false, day: 1, time: '08:00'),
-      waterReminders: NotificationPreference(enabled: false, intervalHours: 2),
-      birthday: NotificationPreference(enabled: false, time: '09:00'),
+      dailyPlanning: NotificationPreference(enabled: true, time: '20:00'),
+      dayRating: NotificationPreference(enabled: true, time: '20:00'),
+      progressPhoto: NotificationPreference(enabled: true, day: 1, time: '09:00'),
+      weightTracking: NotificationPreference(enabled: true, day: 1, time: '08:00'),
+      waterReminders: NotificationPreference(enabled: true, intervalHours: 2),
+      birthday: NotificationPreference(enabled: true, time: '09:00'),
     );
   }
 }

@@ -22,27 +22,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-    _loadNotificationSettings();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadUserData();
+    if (!mounted) return;
+    await _loadNotificationSettings();
   }
 
   Future<void> _loadUserData() async {
     try {
       final user = await _userController.getStoredUser();
-      setState(() {
-        _user = user;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _user = user;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      print('Error loading user data: $e');
     }
   }
 
   Future<void> _loadNotificationSettings() async {
+    if (!mounted) return;
+    
     final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
     await notificationProvider.loadSettings(user: _user);
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   String getUserInitials() {
@@ -114,8 +126,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showNotificationsDialog() {
-    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
-
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -132,20 +142,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         content: SingleChildScrollView(
           child: Consumer<NotificationProvider>(
             builder: (context, provider, child) {
-              // Show error snackbar if there's an error
-              if (provider.errorMessage != null) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(provider.errorMessage!),
-                      backgroundColor: Colors.red[600],
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                  provider.clearError();
-                });
-              }
-
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -154,16 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Podsjetnik za planiranje sljedećeg dana',
                     value: provider.dailyPlanning,
                     onChanged: (value) async {
-                      final success = await provider.setDailyPlanning(value);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
-                            backgroundColor: Colors.red[600],
-                          ),
-                        );
-                        provider.clearError();
-                      }
+                      await provider.setDailyPlanning(value);
                     },
                   ),
                   const SizedBox(height: 8),
@@ -172,16 +159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Večernji podsjetnik za ocjenjivanje dana',
                     value: provider.dayRating,
                     onChanged: (value) async {
-                      final success = await provider.setDayRating(value);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
-                            backgroundColor: Colors.red[600],
-                          ),
-                        );
-                        provider.clearError();
-                      }
+                      await provider.setDayRating(value);
                     },
                   ),
                   const SizedBox(height: 8),
@@ -190,16 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Tjedni podsjetnik za fotografije',
                     value: provider.progressPhoto,
                     onChanged: (value) async {
-                      final success = await provider.setProgressPhoto(value);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
-                            backgroundColor: Colors.red[600],
-                          ),
-                        );
-                        provider.clearError();
-                      }
+                      await provider.setProgressPhoto(value);
                     },
                   ),
                   const SizedBox(height: 8),
@@ -208,16 +177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Tjedni podsjetnik za vaganje',
                     value: provider.weight,
                     onChanged: (value) async {
-                      final success = await provider.setWeight(value);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
-                            backgroundColor: Colors.red[600],
-                          ),
-                        );
-                        provider.clearError();
-                      }
+                      await provider.setWeight(value);
                     },
                   ),
                   const SizedBox(height: 8),
@@ -226,16 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Podsjetnici za piće vode',
                     value: provider.water,
                     onChanged: (value) async {
-                      final success = await provider.setWater(value);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
-                            backgroundColor: Colors.red[600],
-                          ),
-                        );
-                        provider.clearError();
-                      }
+                      await provider.setWater(value);
                     },
                   ),
                   const SizedBox(height: 8),
@@ -244,16 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Čestitka na rođendan',
                     value: provider.birthday,
                     onChanged: (value) async {
-                      final success = await provider.setBirthday(value, _user);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.errorMessage ?? 'Greška pri ažuriranju obavještenja'),
-                            backgroundColor: Colors.red[600],
-                          ),
-                        );
-                        provider.clearError();
-                      }
+                      await provider.setBirthday(value, _user);
                     },
                   ),
                 ],
@@ -275,7 +217,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
-    required void Function(bool) onChanged,
+    required Future<void> Function(bool) onChanged,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -311,7 +253,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Switch(
             value: value,
-            onChanged: onChanged,
+            onChanged: (newValue) => onChanged(newValue),
             activeColor: Theme.of(context).colorScheme.primary,
           ),
         ],
