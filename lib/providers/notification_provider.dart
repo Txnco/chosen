@@ -125,7 +125,10 @@ class NotificationProvider extends ChangeNotifier {
       return false;
     }
 
-    await NotificationsController.scheduleDailyPlanningReminder(enabled: value);
+    await NotificationsController.scheduleDailyPlanningReminder(
+      enabled: value,
+      time: _dailyPlanningPrefs?.time,
+    );
     return true;
   }
 
@@ -143,7 +146,10 @@ class NotificationProvider extends ChangeNotifier {
       return false;
     }
 
-    await NotificationsController.scheduleDayRatingReminder(enabled: value);
+    await NotificationsController.scheduleDayRatingReminder(
+      enabled: value,
+      time: _dayRatingPrefs?.time,
+    );
     return true;
   }
 
@@ -161,7 +167,11 @@ class NotificationProvider extends ChangeNotifier {
       return false;
     }
 
-    await NotificationsController.scheduleWeeklyProgressPhotoReminder(enabled: value);
+    await NotificationsController.scheduleWeeklyProgressPhotoReminder(
+      enabled: value,
+      day: _progressPhotoPrefs?.day,
+      time: _progressPhotoPrefs?.time,
+    );
     return true;
   }
 
@@ -179,7 +189,11 @@ class NotificationProvider extends ChangeNotifier {
       return false;
     }
 
-    await NotificationsController.scheduleWeeklyWeightReminder(enabled: value);
+    await NotificationsController.scheduleWeeklyWeightReminder(
+      enabled: value,
+      day: _weightPrefs?.day,
+      time: _weightPrefs?.time,
+    );
     return true;
   }
 
@@ -222,6 +236,7 @@ class NotificationProvider extends ChangeNotifier {
     await NotificationsController.scheduleBirthdayNotification(
       enabled: value,
       user: user,
+      time: _birthdayPrefs?.time,
     );
     return true;
   }

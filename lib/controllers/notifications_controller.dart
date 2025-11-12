@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chosen/models/user.dart';
 import 'package:chosen/models/notification_preferences.dart';
 import 'package:chosen/utils/chosen_api.dart';
+import 'package:chosen/main.dart';
 import 'dart:convert';
 
 class NotificationsController {
@@ -18,6 +19,41 @@ class NotificationsController {
   static const int weeklyWeightId = 4;
   static const int waterIntakeId = 5;
   static const int birthdayId = 6;
+
+  // Helper method to parse time string "HH:MM" to hour and minute
+  static Map<String, int> _parseTime(String? timeString) {
+    if (timeString == null || !timeString.contains(':')) {
+      return {'hour': 20, 'minute': 0}; // Default to 20:00
+    }
+
+    try {
+      final parts = timeString.split(':');
+      return {
+        'hour': int.parse(parts[0]),
+        'minute': int.parse(parts[1]),
+      };
+    } catch (e) {
+      print('Error parsing time string: $timeString');
+      return {'hour': 20, 'minute': 0};
+    }
+  }
+
+  // Helper method to convert day string to weekday int
+  static int _parseDayOfWeek(String? dayString) {
+    if (dayString == null) return DateTime.monday;
+
+    const dayMap = {
+      'monday': DateTime.monday,
+      'tuesday': DateTime.tuesday,
+      'wednesday': DateTime.wednesday,
+      'thursday': DateTime.thursday,
+      'friday': DateTime.friday,
+      'saturday': DateTime.saturday,
+      'sunday': DateTime.sunday,
+    };
+
+    return dayMap[dayString.toLowerCase()] ?? DateTime.monday;
+  }
 
   // Initialize notifications
   static Future<void> initialize() async {
@@ -58,29 +94,68 @@ class NotificationsController {
   }
 
   static void _onNotificationTap(NotificationResponse response) {
-    // Handle notification tap - can be extended to navigate to specific screens
-    print('Notification tapped: ${response.payload}');
+    // Handle notification tap - navigate to specific screens based on payload
+    final payload = response.payload;
+    print('Notification tapped: $payload');
+
+    if (payload == null) return;
+
+    // Use the global navigator key to navigate
+    final context = navigatorKey.currentContext;
+    if (context == null) {
+      print('Navigation context not available');
+      return;
+    }
+
+    // Navigate to appropriate screen based on notification type
+    switch (payload) {
+      case 'daily_planning':
+        // Navigate to dashboard where daily planning happens
+        navigatorKey.currentState?.pushNamed('/dashboard');
+        break;
+      case 'day_rating':
+        // Navigate to day rating screen
+        navigatorKey.currentState?.pushNamed('/day-rating');
+        break;
+      case 'progress_photo':
+        // Navigate to progress photos screen
+        navigatorKey.currentState?.pushNamed('/progress-photos');
+        break;
+      case 'weight_tracking':
+        // Navigate to weight tracking screen
+        navigatorKey.currentState?.pushNamed('/weight-tracking');
+        break;
+      case 'water_intake':
+        // Navigate to water tracking screen
+        navigatorKey.currentState?.pushNamed('/water-tracking');
+        break;
+      case 'birthday':
+        // Navigate to dashboard for birthday
+        navigatorKey.currentState?.pushNamed('/dashboard');
+        break;
+      default:
+        print('Unknown notification payload: $payload');
+    }
   }
 
-  // Schedule daily planning reminder (1-2 hours before bedtime)
+  // Schedule daily planning reminder
   static Future<void> scheduleDailyPlanningReminder({
     required bool enabled,
-    int bedtimeHour = 22,
-    int reminderHoursBefore = 2,
+    String? time,
   }) async {
     await _notifications.cancel(dailyPlanningId);
 
     if (!enabled) return;
 
-    final reminderHour = bedtimeHour - reminderHoursBefore;
+    final timeData = _parseTime(time);
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
       tz.local,
       now.year,
       now.month,
       now.day,
-      reminderHour,
-      0,
+      timeData['hour']!,
+      timeData['minute']!,
     );
 
     // If time has passed today, schedule for tomorrow
@@ -114,23 +189,24 @@ class NotificationsController {
     await prefs.setBool('notification_daily_planning', enabled);
   }
 
-  // Schedule day rating notification (evening)
+  // Schedule day rating notification
   static Future<void> scheduleDayRatingReminder({
     required bool enabled,
-    int hour = 20,
+    String? time,
   }) async {
     await _notifications.cancel(dayRatingId);
 
     if (!enabled) return;
 
+    final timeData = _parseTime(time);
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
       tz.local,
       now.year,
       now.month,
       now.day,
-      hour,
-      0,
+      timeData['hour']!,
+      timeData['minute']!,
     );
 
     if (scheduledDate.isBefore(now)) {
@@ -166,15 +242,16 @@ class NotificationsController {
   // Schedule weekly progress photo reminder
   static Future<void> scheduleWeeklyProgressPhotoReminder({
     required bool enabled,
-    int dayOfWeek = DateTime.monday,
-    int hour = 9,
+    String? day,
+    String? time,
   }) async {
     await _notifications.cancel(weeklyProgressPhotoId);
 
     if (!enabled) return;
 
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = _nextInstanceOfWeekday(dayOfWeek, hour);
+    final dayOfWeek = _parseDayOfWeek(day);
+    final timeData = _parseTime(time);
+    var scheduledDate = _nextInstanceOfWeekday(dayOfWeek, timeData['hour']!, timeData['minute']!);
 
     await _notifications.zonedSchedule(
       weeklyProgressPhotoId,
@@ -205,14 +282,16 @@ class NotificationsController {
   // Schedule weekly weigh-in reminder
   static Future<void> scheduleWeeklyWeightReminder({
     required bool enabled,
-    int dayOfWeek = DateTime.monday,
-    int hour = 8,
+    String? day,
+    String? time,
   }) async {
     await _notifications.cancel(weeklyWeightId);
 
     if (!enabled) return;
 
-    var scheduledDate = _nextInstanceOfWeekday(dayOfWeek, hour);
+    final dayOfWeek = _parseDayOfWeek(day);
+    final timeData = _parseTime(time);
+    var scheduledDate = _nextInstanceOfWeekday(dayOfWeek, timeData['hour']!, timeData['minute']!);
 
     await _notifications.zonedSchedule(
       weeklyWeightId,
@@ -302,6 +381,7 @@ class NotificationsController {
   static Future<void> scheduleBirthdayNotification({
     required bool enabled,
     required UserModel? user,
+    String? time,
   }) async {
     await _notifications.cancel(birthdayId);
 
@@ -309,6 +389,7 @@ class NotificationsController {
 
     final birthdate = user!.birthdate!;
     final now = DateTime.now();
+    final timeData = _parseTime(time);
 
     // Schedule for this year's birthday
     var scheduledDate = tz.TZDateTime(
@@ -316,8 +397,8 @@ class NotificationsController {
       now.year,
       birthdate.month,
       birthdate.day,
-      9,
-      0,
+      timeData['hour']!,
+      timeData['minute']!,
     );
 
     // If birthday has passed this year, schedule for next year
@@ -327,8 +408,8 @@ class NotificationsController {
         now.year + 1,
         birthdate.month,
         birthdate.day,
-        9,
-        0,
+        timeData['hour']!,
+        timeData['minute']!,
       );
     }
 
@@ -359,7 +440,7 @@ class NotificationsController {
   }
 
   // Helper method to get next instance of a specific weekday
-  static tz.TZDateTime _nextInstanceOfWeekday(int weekday, int hour) {
+  static tz.TZDateTime _nextInstanceOfWeekday(int weekday, int hour, int minute) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
       tz.local,
@@ -367,7 +448,7 @@ class NotificationsController {
       now.month,
       now.day,
       hour,
-      0,
+      minute,
     );
 
     while (scheduledDate.weekday != weekday || scheduledDate.isBefore(now)) {
@@ -390,31 +471,53 @@ class NotificationsController {
     };
   }
 
-  // Reschedule all notifications based on saved preferences
+  // Reschedule all notifications based on API preferences
   static Future<void> rescheduleAllNotifications(UserModel? user) async {
-    final settings = await getNotificationSettings();
-    final prefs = await SharedPreferences.getInstance();
-    final waterInterval = prefs.getInt('notification_water_interval') ?? 2;
+    // Fetch latest preferences from API
+    final apiPrefs = await fetchPreferencesFromApi();
 
+    if (apiPrefs == null) {
+      // Fallback to local settings if API fails
+      final settings = await getNotificationSettings();
+      final prefs = await SharedPreferences.getInstance();
+      final waterInterval = prefs.getInt('notification_water_interval') ?? 2;
+
+      await scheduleDailyPlanningReminder(enabled: settings['daily_planning'] ?? false);
+      await scheduleDayRatingReminder(enabled: settings['day_rating'] ?? false);
+      await scheduleWeeklyProgressPhotoReminder(enabled: settings['progress_photo'] ?? false);
+      await scheduleWeeklyWeightReminder(enabled: settings['weight'] ?? false);
+      await scheduleWaterReminders(enabled: settings['water'] ?? false, intervalHours: waterInterval);
+      await scheduleBirthdayNotification(enabled: settings['birthday'] ?? false, user: user);
+      return;
+    }
+
+    // Use API preferences
     await scheduleDailyPlanningReminder(
-      enabled: settings['daily_planning'] ?? false,
+      enabled: apiPrefs.dailyPlanning.enabled,
+      time: apiPrefs.dailyPlanning.time,
     );
     await scheduleDayRatingReminder(
-      enabled: settings['day_rating'] ?? false,
+      enabled: apiPrefs.dayRating.enabled,
+      time: apiPrefs.dayRating.time,
     );
     await scheduleWeeklyProgressPhotoReminder(
-      enabled: settings['progress_photo'] ?? false,
+      enabled: apiPrefs.progressPhoto.enabled,
+      day: apiPrefs.progressPhoto.day,
+      time: apiPrefs.progressPhoto.time,
     );
     await scheduleWeeklyWeightReminder(
-      enabled: settings['weight'] ?? false,
+      enabled: apiPrefs.weightTracking.enabled,
+      day: apiPrefs.weightTracking.day,
+      time: apiPrefs.weightTracking.time,
     );
     await scheduleWaterReminders(
-      enabled: settings['water'] ?? false,
-      intervalHours: waterInterval,
+      enabled: apiPrefs.waterReminders.enabled,
+      intervalHours: apiPrefs.waterReminders.intervalHours ?? 2,
     );
     await scheduleBirthdayNotification(
-      enabled: settings['birthday'] ?? false,
+      enabled: apiPrefs.birthday.enabled,
       user: user,
+      time: apiPrefs.birthday.time,
     );
   }
 

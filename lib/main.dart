@@ -13,6 +13,8 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/tracking/weight_tracking_screen.dart';
+import 'screens/tracking/progress_photos_screen.dart';
+import 'screens/tracking/day_rating_tracking_screen.dart';
 import 'screens/events/event_screen.dart';
 import 'screens/testing/notification_test_screen.dart';
 
@@ -33,6 +35,9 @@ void main() async {
   );
 }
 
+// Global navigation key for notifications
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -43,12 +48,13 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'Chosen',
           debugShowCheckedModeBanner: false,
-          
+          navigatorKey: navigatorKey,
+
           // Use your custom themes
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          
+
           initialRoute: '/splash',
 
           routes: {
@@ -61,6 +67,8 @@ class MyApp extends StatelessWidget {
             '/settings': (_) => const SettingsScreen(),
             '/profile': (context) => const ProfileScreen(),
             '/weight-tracking': (_) => const WeightTrackingScreen(),
+            '/progress-photos': (_) => const ProgressPhotosScreen(),
+            '/day-rating': (_) => const DayRatingTrackingScreen(),
             '/events': (context) => const EventScreen(),
             '/notification-test': (_) => const NotificationTestScreen(),
           },
