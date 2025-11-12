@@ -98,12 +98,17 @@ class NotificationsController {
     final payload = response.payload;
     print('Notification tapped: $payload');
 
-    if (payload == null) return;
-
     // Use the global navigator key to navigate
     final context = navigatorKey.currentContext;
     if (context == null) {
       print('Navigation context not available');
+      return;
+    }
+
+    // If payload is null or empty (old notifications), default to dashboard
+    if (payload == null || payload.isEmpty) {
+      print('Empty payload - navigating to dashboard (old notification)');
+      navigatorKey.currentState?.pushNamed('/dashboard');
       return;
     }
 
@@ -134,7 +139,8 @@ class NotificationsController {
         navigatorKey.currentState?.pushNamed('/dashboard');
         break;
       default:
-        print('Unknown notification payload: $payload');
+        print('Unknown notification payload: $payload - navigating to dashboard');
+        navigatorKey.currentState?.pushNamed('/dashboard');
     }
   }
 
@@ -605,6 +611,9 @@ class NotificationsController {
     final apiPreferences = await fetchPreferencesFromApi();
 
     if (apiPreferences != null) {
+      // Cancel all pending AND delivered notifications to clear old ones
+      await _notifications.cancelAll();
+
       // Update local SharedPreferences to match backend
       final prefs = await SharedPreferences.getInstance();
 
@@ -621,6 +630,8 @@ class NotificationsController {
 
       // Reschedule all notifications based on synced preferences
       await rescheduleAllNotifications(user);
+
+      print('All old notifications cleared and rescheduled with proper payloads');
     }
   }
 
