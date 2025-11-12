@@ -105,17 +105,50 @@ class _EventScreenState extends State<EventScreen> {
     }
   }
 
-  void _nextDate() {
-    final tomorrow = _selectedDay!.add(const Duration(days: 1));
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    if (DateTime(tomorrow.year, tomorrow.month, tomorrow.day).isAfter(today)) {
-      return; // Don't allow future dates
-    }
-    
+void _nextDate() {
+  // Remove the restriction on future dates
+  setState(() {
+    _selectedDay = _selectedDay!.add(const Duration(days: 1));
+    _selectedEvents = _getEventsForDay(_selectedDay!);
+  });
+  
+  // Reload events if we move to a different month
+  if (_selectedDay!.month != _focusedDay.month) {
+    _focusedDay = _selectedDay!;
+    _loadEvents();
+  }
+}
+
+ void _selectDate() async {
+  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  final isDarkMode = themeProvider.themeMode == ThemeMode.dark ||
+      (themeProvider.themeMode == ThemeMode.system &&
+          MediaQuery.of(context).platformBrightness == Brightness.dark);
+  
+  final picked = await showDatePicker(
+    context: context,
+    initialDate: _selectedDay!,
+    firstDate: DateTime(2020),
+    lastDate: DateTime(2030), // Changed from DateTime.now() to allow future dates
+    builder: (context, child) {
+      return Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: isDarkMode ? Colors.white : Colors.black,
+            onPrimary: isDarkMode ? Colors.black : Colors.white,
+            surface: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            onSurface: isDarkMode ? Colors.white : Colors.black,
+          ),
+          dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        ),
+        child: child!,
+      );
+    },
+  );
+  
+  if (picked != null && picked != _selectedDay) {
     setState(() {
-      _selectedDay = tomorrow;
+      _selectedDay = picked;
       _selectedEvents = _getEventsForDay(_selectedDay!);
     });
     // Reload events if we move to a different month
@@ -124,46 +157,7 @@ class _EventScreenState extends State<EventScreen> {
       _loadEvents();
     }
   }
-
-  void _selectDate() async {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDarkMode = themeProvider.themeMode == ThemeMode.dark ||
-        (themeProvider.themeMode == ThemeMode.system &&
-            MediaQuery.of(context).platformBrightness == Brightness.dark);
-    
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDay!,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: isDarkMode ? Colors.white : Colors.black,
-              onPrimary: isDarkMode ? Colors.black : Colors.white,
-              surface: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-              onSurface: isDarkMode ? Colors.white : Colors.black,
-            ),
-            dialogBackgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (picked != null && picked != _selectedDay) {
-      setState(() {
-        _selectedDay = picked;
-        _selectedEvents = _getEventsForDay(_selectedDay!);
-      });
-      // Reload events if we move to a different month
-      if (_selectedDay!.month != _focusedDay.month) {
-        _focusedDay = _selectedDay!;
-        _loadEvents();
-      }
-    }
-  }
+}
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -349,11 +343,7 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Widget _buildDateSelector() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selectedDay = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
-    final canGoForward = selectedDay.isBefore(today);
-    
+    // Remove the restriction on the forward button
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -396,11 +386,9 @@ class _EventScreenState extends State<EventScreen> {
             ),
           ),
           IconButton(
-            onPressed: canGoForward ? _nextDate : null,
+            onPressed: _nextDate, // Always enabled now
             icon: const Icon(Icons.chevron_right, size: 24),
-            color: canGoForward 
-                ? Theme.of(context).textTheme.bodySmall?.color 
-                : Theme.of(context).dividerColor,
+            color: Theme.of(context).textTheme.bodySmall?.color,
           ),
         ],
       ),

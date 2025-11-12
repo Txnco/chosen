@@ -12,6 +12,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:chosen/models/motivational_quote.dart';
 import 'package:chosen/controllers/quote_controller.dart';
 import 'package:chosen/config/app_theme.dart';
+import 'package:chosen/controllers/message_controller.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -460,52 +462,198 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildDashboardGrid() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.2,
-        children: [
-          _buildDashboardCard(
-            'Dnevni plan', 
-            Icons.today_outlined, 
-            'Kreni i planiraj svoj dan!',
-            onTap: () {
-              Navigator.pushNamed(context, '/events');
-            },
+Widget _buildDashboardGrid() {
+  // Build list of cards dynamically based on user role
+  final List<Widget> cards = [
+    _buildDashboardCard(
+      'Dnevni plan', 
+      Icons.today_outlined, 
+      'Kreni i planiraj svoj dan!',
+      onTap: () {
+        Navigator.pushNamed(context, '/events');
+      },
+    ),
+    _buildWaterCard(),
+    _buildDashboardCard(
+      'Poruke', 
+      Icons.chat_bubble_outline, 
+      _user?.id == 1 ? 'Razgovaraj s klijentima' : 'Razgovaraj s trenerom',
+      onTap: () async {
+        // Admin goes to messaging screen to see all clients
+        if (_user?.id == 1) {
+          Navigator.pushNamed(context, '/messaging');
+          return;
+        }
+        
+        // Clients go directly to trainer chat
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Učitavanje razgovora...'),
+            backgroundColor: Colors.blue[600],
+            duration: const Duration(seconds: 1),
           ),
-          _buildWaterCard(),
-          _buildDashboardCard(
-            'Poruka treneru', 
-            Icons.chat_bubble_outline, 
-            'Razgovaraj s trenerom',
-            onTap: () {
-              Navigator.pushNamed(context, '/messaging');
-            },
-          ),
-          _buildDashboardCard(
-            'Nazovi trenera', 
-            Icons.phone_outlined,
-            'Kontaktiraj trenera',
-            onTap: () {
+        );
+        
+        try {
+          // Get conversations
+          final conversations = await MessageController.getConversations();
+          
+          if (conversations.isEmpty) {
+            if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Funkcija poziva dolazi uskoro!'),
-                  backgroundColor: Colors.blue[600],
-                  duration: const Duration(seconds: 2),
+                const SnackBar(
+                  content: Text('Nema dostupnih razgovora. Kontaktirajte podršku.'),
+                  backgroundColor: Colors.orange,
                 ),
               );
-            },
-          ),
-        ],
+            }
+            return;
+          }
+          
+          // Client should have only one conversation with their trainer
+          final trainerConversation = conversations.first;
+          
+          if (mounted) {
+            await Navigator.pushNamed(
+              context, 
+              '/chat',
+              arguments: {
+                'conversation': trainerConversation,
+                'currentUserId': _user?.id,
+              },
+            );
+            
+            // Refresh after returning from chat
+            if (_hasInitialized) {
+              _loadUser();
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Greška: ${e.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      },
+    ),
+  ];
+
+  // Add "Nazovi trenera" card only if user is NOT admin (id != 1)
+  if (_user?.id != 1) {
+    cards.add(
+      _buildDashboardCard(
+        'Nazovi trenera', 
+        Icons.phone_outlined,
+        'Kontaktiraj trenera',
+        onTap: _callTrainer,
       ),
     );
   }
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    child: GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.2,
+      children: cards,
+    ),
+  );
+}
+
+Future<void> _callTrainer() async {
+  try {
+    // Get trainer information
+    final trainerInfo ={
+      'trainer_name': "Slaven Mišović",
+      'phone_number': "+385994581050",
+    };
+    
+    if (trainerInfo['trainer_name'] == null || trainerInfo['phone_number'] == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Broj telefona trenera nije dostupan.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+    
+    final phoneNumber = trainerInfo['phone_number'] as String;
+    final trainerName = trainerInfo['trainer_name'] as String;
+    
+    // Remove any spaces or special characters except +
+    final cleanedNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    
+    // Show confirmation dialog
+    if (mounted) {
+      final shouldCall = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Pozovi trenera'),
+          content: Text(
+            trainerName.isNotEmpty 
+              ? 'Želite li pozvati $trainerName?\n$phoneNumber'
+              : 'Želite li pozvati trenera?\n$phoneNumber'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Odustani'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+              ),
+              child: Text(
+                'Pozovi',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      
+      if (shouldCall == true) {
+        final uri = Uri.parse('tel:$cleanedNumber');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Nije moguće izvršiti poziv.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Greška: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
 
   Widget _buildDashboardCard(String title, IconData icon, String subtitle, {VoidCallback? onTap}) {
     return InkWell(

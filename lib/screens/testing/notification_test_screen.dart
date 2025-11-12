@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:chosen/controllers/notifications_controller.dart';
 import 'package:chosen/controllers/user_controller.dart';
-import 'package:chosen/providers/notification_provider.dart';
+import 'package:chosen/managers/session_manager.dart';
 
-/// Testing screen for quickly testing notifications
-/// This screen is for development/testing purposes only
 class NotificationTestScreen extends StatefulWidget {
   const NotificationTestScreen({super.key});
 
@@ -19,260 +16,308 @@ class _NotificationTestScreenState extends State<NotificationTestScreen> {
   final _notifications = FlutterLocalNotificationsPlugin();
   final _userController = UserController();
   String _statusMessage = '';
+  List<int> _pendingIds = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingNotifications();
+  }
+
+  Future<void> _loadPendingNotifications() async {
+    setState(() => _isLoading = true);
+    final ids = await NotificationsController.getPendingNotificationIds();
+    setState(() {
+      _pendingIds = ids;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notification Testing'),
+        backgroundColor: Colors.red,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Quick Notification Tests',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // CRITICAL WARNING CARD
+                  Card(
+                    color: Colors.red.shade100,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.warning, color: Colors.red.shade700, size: 32),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'OLD NOTIFICATIONS FIX',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '⚠️ If you have OLD notifications in your notification tray (from before the payload fix), they won\'t work.',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '✅ SOLUTION: Manually swipe away ALL notifications from your tray, then use the buttons below to test.',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // TEST WITH PAYLOAD - These will work!
+                  const Text(
+                    'Test Notifications WITH Payloads',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'These notifications have proper payloads and WILL navigate correctly',
+                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildTestButton(
+                    'Test Water Tracking Navigation',
+                    'Tap this notification → Should open Water Tracking',
+                    () => _testNotificationWithPayload(
+                      id: 1001,
+                      title: 'Hydration Time',
+                      body: 'TAP ME to test water tracking navigation',
+                      payload: 'water_intake',
+                    ),
+                    Colors.blue,
+                  ),
+
+                  _buildTestButton(
+                    'Test Day Rating Navigation',
+                    'Tap this notification → Should open Day Rating',
+                    () => _testNotificationWithPayload(
+                      id: 1002,
+                      title: 'Rate Your Day',
+                      body: 'TAP ME to test day rating navigation',
+                      payload: 'day_rating',
+                    ),
+                    Colors.orange,
+                  ),
+
+                  _buildTestButton(
+                    'Test Weight Tracking Navigation',
+                    'Tap this notification → Should open Weight Tracking',
+                    () => _testNotificationWithPayload(
+                      id: 1003,
+                      title: 'Weekly Weigh-In',
+                      body: 'TAP ME to test weight tracking navigation',
+                      payload: 'weight_tracking',
+                    ),
+                    Colors.purple,
+                  ),
+
+                  _buildTestButton(
+                    'Test Progress Photos Navigation',
+                    'Tap this notification → Should open Progress Photos',
+                    () => _testNotificationWithPayload(
+                      id: 1004,
+                      title: 'Weekly Progress Photo',
+                      body: 'TAP ME to test progress photos navigation',
+                      payload: 'progress_photo',
+                    ),
+                    Colors.green,
+                  ),
+
+                  _buildTestButton(
+                    'Test Events Navigation',
+                    'Tap this notification → Should open Events/Calendar',
+                    () => _testNotificationWithPayload(
+                      id: 1005,
+                      title: 'Plan Your Day',
+                      body: 'TAP ME to test events navigation',
+                      payload: 'daily_planning',
+                    ),
+                    Colors.teal,
+                  ),
+
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  // COMPLETE RESET SECTION
+                  const Text(
+                    'Nuclear Option',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildTestButton(
+                    'Clear Everything & Reschedule',
+                    'Clears all notifications and reschedules with payloads',
+                    () => _clearAndReschedule(),
+                    Colors.red,
+                  ),
+
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  // PENDING NOTIFICATIONS
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Pending Notifications',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _pendingIds.isEmpty
+                                ? 'No pending notifications'
+                                : 'IDs: ${_pendingIds.join(", ")}',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Count: ${_pendingIds.length}',
+                            style: const TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _loadPendingNotifications,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Refresh List'),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  if (_statusMessage.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Text(
+                        _statusMessage,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Test individual notifications immediately',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            _buildTestButton(
-              'Test Daily Planning',
-              'Trigger planning notification now',
-              () => _testImmediateNotification(
-                id: 100,
-                title: 'Plan Your Day',
-                body: 'Take a moment to plan tomorrow and set your goals!',
-              ),
-            ),
-            _buildTestButton(
-              'Test Day Rating',
-              'Trigger day rating notification now',
-              () => _testImmediateNotification(
-                id: 101,
-                title: 'Rate Your Day',
-                body: 'How was your day? Take a moment to reflect and rate it.',
-              ),
-            ),
-            _buildTestButton(
-              'Test Progress Photo',
-              'Trigger progress photo notification now',
-              () => _testImmediateNotification(
-                id: 102,
-                title: 'Weekly Progress Photo',
-                body: 'Time for your weekly progress photo! Track your transformation.',
-              ),
-            ),
-            _buildTestButton(
-              'Test Weight Tracking',
-              'Trigger weight notification now',
-              () => _testImmediateNotification(
-                id: 103,
-                title: 'Weekly Weigh-In',
-                body: 'Time to record your weight. Consistency is key!',
-              ),
-            ),
-            _buildTestButton(
-              'Test Water Reminder',
-              'Trigger water notification now',
-              () => _testImmediateNotification(
-                id: 104,
-                title: 'Hydration Time',
-                body: 'Remember to drink water! Stay hydrated.',
-              ),
-            ),
-            _buildTestButton(
-              'Test Birthday',
-              'Trigger birthday notification now',
-              () async {
-                final user = await _userController.getStoredUser();
-                await _testImmediateNotification(
-                  id: 105,
-                  title: 'Happy Birthday!',
-                  body: '${user?.firstName ?? 'Friend'}, wishing you a wonderful birthday! Keep crushing your goals!',
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
-              'Scheduled Notifications',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Test actual scheduling (5 seconds delay)',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            _buildTestButton(
-              'Schedule Test Notification',
-              'Will appear in 5 seconds',
-              () => _scheduleTestNotification(),
-            ),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
-              'Debug Information',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildTestButton(
-              'View Pending Notifications',
-              'See all scheduled notifications',
-              () => _viewPendingNotifications(),
-            ),
-            _buildTestButton(
-              'View Current Settings',
-              'See notification preferences',
-              () => _viewSettings(),
-            ),
-            _buildTestButton(
-              'Cancel All Notifications',
-              'Clear all scheduled notifications',
-              () => _cancelAllNotifications(),
-            ),
-            const SizedBox(height: 24),
-            if (_statusMessage.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Text(
-                  _statusMessage,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildTestButton(String title, String subtitle, VoidCallback onPressed) {
+  Widget _buildTestButton(
+    String title,
+    String subtitle,
+    VoidCallback onPressed,
+    Color color,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: color.withOpacity(0.1),
       child: ListTile(
+        leading: Icon(Icons.notifications_active, color: color, size: 32),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.w600, color: color),
         ),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.play_arrow),
+        trailing: Icon(Icons.play_arrow, color: color),
         onTap: onPressed,
       ),
     );
   }
 
-  Future<void> _testImmediateNotification({
+  Future<void> _testNotificationWithPayload({
     required int id,
     required String title,
     required String body,
+    required String payload,
   }) async {
     try {
       await _notifications.show(
         id,
         title,
         body,
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             'test_channel',
             'Test Notifications',
-            channelDescription: 'Testing notifications',
-            importance: Importance.high,
+            channelDescription: 'Testing notifications with payloads',
+            importance: Importance.max,
             priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
           ),
-          iOS: DarwinNotificationDetails(),
+          iOS: const DarwinNotificationDetails(),
+        ),
+        payload: payload, // THIS IS THE KEY - payload is included!
+      );
+      _setStatus('✅ Notification sent with payload: "$payload"\n\nNow TAP the notification in your tray to test navigation!');
+    } catch (e) {
+      _setStatus('❌ Error: $e');
+    }
+  }
+
+  Future<void> _clearAndReschedule() async {
+    setState(() => _isLoading = true);
+    
+    final user = await SessionManager.getCurrentUser();
+    
+    // Clear everything
+    await NotificationsController.clearAllPendingNotifications();
+    
+    // Reschedule with proper payloads
+    await NotificationsController.syncPreferencesWithApi(user);
+    
+    await _loadPendingNotifications();
+    
+    setState(() => _isLoading = false);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Cleared and rescheduled all notifications!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
         ),
       );
-      _setStatus('✅ Notification sent: $title');
-    } catch (e) {
-      _setStatus('❌ Error: $e');
     }
-  }
-
-  Future<void> _scheduleTestNotification() async {
-    try {
-      final scheduledDate = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5));
-      await _notifications.zonedSchedule(
-        999,
-        'Test Scheduled Notification',
-        'This notification was scheduled 5 seconds ago',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'test_channel',
-            'Test Notifications',
-            channelDescription: 'Testing notifications',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-      _setStatus('✅ Notification scheduled for 5 seconds from now');
-    } catch (e) {
-      _setStatus('❌ Error scheduling: $e');
-    }
-  }
-
-  Future<void> _viewPendingNotifications() async {
-    try {
-      final pending = await _notifications.pendingNotificationRequests();
-      final message = 'Pending notifications: ${pending.length}\n\n' +
-          pending
-              .map((n) => 'ID: ${n.id}, Title: ${n.title}')
-              .join('\n');
-      _setStatus(message);
-    } catch (e) {
-      _setStatus('❌ Error: $e');
-    }
-  }
-
-  Future<void> _viewSettings() async {
-    try {
-      final settings = await NotificationsController.getNotificationSettings();
-      final message = 'Current Settings:\n\n' +
-          settings.entries
-              .map((e) => '${e.key}: ${e.value ? "✅" : "❌"}')
-              .join('\n');
-      _setStatus(message);
-    } catch (e) {
-      _setStatus('❌ Error: $e');
-    }
-  }
-
-  Future<void> _cancelAllNotifications() async {
-    try {
-      await _notifications.cancelAll();
-      _setStatus('✅ All notifications cancelled');
-    } catch (e) {
-      _setStatus('❌ Error: $e');
-    }
+    
+    _setStatus('✅ All notifications cleared and rescheduled.\n\nManually clear your notification tray, then wait for new notifications to appear.');
   }
 
   void _setStatus(String message) {

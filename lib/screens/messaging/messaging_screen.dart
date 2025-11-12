@@ -47,6 +47,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
         _loadConversations(),
       ]);
 
+      await _autoNavigateIfClient();
+
     } catch (e) {
       print('Error initializing messaging: $e');
       if (mounted) {
@@ -63,6 +65,30 @@ class _MessagingScreenState extends State<MessagingScreen> {
       }
     }
   }
+
+Future<void> _autoNavigateIfClient() async {
+  // Get user to check role
+  final user = await _userController.getStoredUser();
+  
+  // Only auto-navigate if user is a CLIENT (roleId == 2, NOT admin with id == 1)
+  if (user != null && user.roleId == 2 && user.id != 1 && _conversations.isNotEmpty && mounted) {
+    // Navigate to trainer chat
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversation: _conversations.first,
+          currentUserId: _currentUserId,
+        ),
+      ),
+    );
+    
+    // When returning from chat, pop back to dashboard
+    if (mounted) {
+      Navigator.pop(context, result);
+    }
+  }
+}
 
   Future<void> _getCurrentUser() async {
     try {

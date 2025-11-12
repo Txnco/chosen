@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -6,10 +7,14 @@ import 'package:chosen/models/user.dart';
 import 'package:chosen/models/notification_preferences.dart';
 import 'package:chosen/utils/chosen_api.dart';
 import 'dart:convert';
+import 'dart:io' show Platform;
+
 
 class NotificationsController {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+
+  static GlobalKey<NavigatorState>? _navigatorKey;
 
   // Notification IDs
   static const int dailyPlanningId = 1;
@@ -19,8 +24,67 @@ class NotificationsController {
   static const int waterIntakeId = 5;
   static const int birthdayId = 6;
 
+  static const Map<String, String> _payloadToRoute = {
+    'daily_planning': '/events',
+    'day_rating': '/day-rating',
+    'progress_photo': '/progress-photos',
+    'weight_tracking': '/weight-tracking',
+    'water_intake': '/water-tracking',
+    'birthday': '/profile',
+  };
+
+
+static Future<bool> canScheduleExactAlarms() async {
+    if (!Platform.isAndroid) {
+      return true; // iOS doesn't need this permission
+    }
+
+    try {
+      final androidImplementation = _notifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidImplementation != null) {
+        final canSchedule = await androidImplementation.canScheduleExactNotifications();
+        return canSchedule ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('Error checking exact alarm permission: $e');
+      return false;
+    }
+  }
+
+  /// Request exact alarm permission (Android 13+)
+  static Future<bool> requestExactAlarmPermission() async {
+    if (!Platform.isAndroid) {
+      return true; // iOS doesn't need this
+    }
+
+    try {
+      final androidImplementation = _notifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidImplementation != null) {
+        // Check if already granted
+        final canSchedule = await androidImplementation.canScheduleExactNotifications();
+        if (canSchedule == true) {
+          return true;
+        }
+
+        // Request permission - this opens system settings
+        final result = await androidImplementation.requestExactAlarmsPermission();
+        return result ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('Error requesting exact alarm permission: $e');
+      return false;
+    }
+  }
+
   // Initialize notifications
-  static Future<void> initialize() async {
+  static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
+    _navigatorKey = navigatorKey;
     tz.initializeTimeZones();
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -55,11 +119,114 @@ class NotificationsController {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+
+    if (Platform.isAndroid) {
+      await requestExactAlarmPermission();
+    }
   }
 
   static void _onNotificationTap(NotificationResponse response) {
-    // Handle notification tap - can be extended to navigate to specific screens
-    print('Notification tapped: ${response.payload}');
+    final payload = response.payload;
+    print('========================================');
+    print('Notification tapped!');
+    print('Payload: "$payload"');
+    print('Payload is null: ${payload == null}');
+    print('Payload is empty: ${payload?.isEmpty ?? true}');
+    print('========================================');
+
+    if (payload != null && payload.isNotEmpty && _payloadToRoute.containsKey(payload)) {
+      final route = _payloadToRoute[payload]!;
+      print('Navigating to route: $route');
+      
+      // Use the navigator key to navigate
+      if (_navigatorKey?.currentState != null) {
+        _navigatorKey!.currentState!.pushNamed(route);
+        print('Navigation executed successfully');
+      } else {
+        print('ERROR: Navigator key is null or not ready');
+      }
+    } else {
+      print('ERROR: Invalid or missing payload');
+      print('Available routes: ${_payloadToRoute.keys.join(", ")}');
+    }
+  }
+
+  /// Clear ALL notifications - both pending and displayed
+static Future<void> clearAllPendingNotifications() async {
+  print('Clearing ALL pending AND displayed notifications...');
+  
+  try {
+    // Cancel all pending notifications
+    await _notifications.cancelAll();
+    
+    // IMPORTANT: Also cancel displayed notifications by ID
+    await _notifications.cancel(dailyPlanningId);
+    await _notifications.cancel(dayRatingId);
+    await _notifications.cancel(weeklyProgressPhotoId);
+    await _notifications.cancel(weeklyWeightId);
+    await _notifications.cancel(birthdayId);
+    
+    // Cancel all water notifications (IDs 100-199)
+    for (int i = 100; i < 200; i++) {
+      await _notifications.cancel(i);
+    }
+    
+    // On Android, we need to explicitly get the Android implementation
+    // and cancel active notifications from the status bar
+    if (Platform.isAndroid) {
+      final androidImplementation = _notifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidImplementation != null) {
+        // Get all active notifications and cancel them
+        final activeNotifications = await androidImplementation.getActiveNotifications();
+        print('Found ${activeNotifications.length} active notifications in tray');
+        
+        for (var notification in activeNotifications) {
+          await _notifications.cancel(notification.id ?? 0);
+          print('Cancelled displayed notification ID: ${notification.id}');
+        }
+      }
+    }
+    
+    print('All pending and displayed notifications cleared');
+  } catch (e) {
+    print('Error clearing notifications: $e');
+  }
+}
+
+/// Get list of pending notification IDs (for debugging)
+static Future<List<int>> getPendingNotificationIds() async {
+  try {
+    final pendingNotifications = await _notifications.pendingNotificationRequests();
+    final ids = pendingNotifications.map((n) => n.id).toList();
+    print('Pending notification IDs: $ids');
+    return ids;
+  } catch (e) {
+    print('Error getting pending notifications: $e');
+    return [];
+  }
+}
+
+  static Future<void> forceRescheduleAllNotifications(UserModel? user) async {
+    print('Force rescheduling all notifications...');
+    
+    // Cancel all existing notifications
+    await _notifications.cancelAll();
+    
+    // Clear local preferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('notification_daily_planning');
+    await prefs.remove('notification_day_rating');
+    await prefs.remove('notification_progress_photo');
+    await prefs.remove('notification_weight');
+    await prefs.remove('notification_water');
+    await prefs.remove('notification_birthday');
+    
+    // Sync from API and reschedule
+    await syncPreferencesWithApi(user);
+    
+    print('All notifications rescheduled with new payloads');
   }
 
   // Schedule daily planning reminder (1-2 hours before bedtime)
@@ -71,6 +238,12 @@ class NotificationsController {
     await _notifications.cancel(dailyPlanningId);
 
     if (!enabled) return;
+
+    // Check permission before scheduling
+    if (!await canScheduleExactAlarms()) {
+      print('Cannot schedule exact alarms - permission not granted');
+      return;
+    }
 
     final reminderHour = bedtimeHour - reminderHoursBefore;
     final now = tz.TZDateTime.now(tz.local);
@@ -88,30 +261,34 @@ class NotificationsController {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    await _notifications.zonedSchedule(
-      dailyPlanningId,
-      'Plan Your Day',
-      'Take a moment to plan tomorrow and set your goals!',
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_planning',
-          'Daily Planning',
-          channelDescription: 'Reminders to plan your day',
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _notifications.zonedSchedule(
+        dailyPlanningId,
+        'Plan Your Day',
+        'Take a moment to plan tomorrow and set your goals!',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_planning',
+            'Daily Planning',
+            channelDescription: 'Reminders to plan your day',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-      payload: 'daily_planning',
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'daily_planning',
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notification_daily_planning', enabled);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_daily_planning', enabled);
+    } catch (e) {
+      print('Error scheduling daily planning reminder: $e');
+    }
   }
 
   // Schedule day rating notification (evening)
@@ -122,6 +299,12 @@ class NotificationsController {
     await _notifications.cancel(dayRatingId);
 
     if (!enabled) return;
+
+    // Check permission before scheduling
+    if (!await canScheduleExactAlarms()) {
+      print('Cannot schedule exact alarms - permission not granted');
+      return;
+    }
 
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
@@ -137,30 +320,34 @@ class NotificationsController {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    await _notifications.zonedSchedule(
-      dayRatingId,
-      'Rate Your Day',
-      'How was your day? Take a moment to reflect and rate it.',
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'day_rating',
-          'Day Rating',
-          channelDescription: 'Reminders to rate your day',
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _notifications.zonedSchedule(
+        dayRatingId,
+        'Rate Your Day',
+        'How was your day? Take a moment to reflect and rate it.',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'day_rating',
+            'Day Rating',
+            channelDescription: 'Reminders to rate your day',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-      payload: 'day_rating',
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'day_rating',
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notification_day_rating', enabled);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_day_rating', enabled);
+    } catch (e) {
+      print('Error scheduling day rating reminder: $e');
+    }
   }
 
   // Schedule weekly progress photo reminder
@@ -173,33 +360,42 @@ class NotificationsController {
 
     if (!enabled) return;
 
-    final now = tz.TZDateTime.now(tz.local);
+    // Check permission before scheduling
+    if (!await canScheduleExactAlarms()) {
+      print('Cannot schedule exact alarms - permission not granted');
+      return;
+    }
+
     var scheduledDate = _nextInstanceOfWeekday(dayOfWeek, hour);
 
-    await _notifications.zonedSchedule(
-      weeklyProgressPhotoId,
-      'Weekly Progress Photo',
-      'Time for your weekly progress photo! Track your transformation.',
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'progress_photo',
-          'Progress Photos',
-          channelDescription: 'Weekly progress photo reminders',
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _notifications.zonedSchedule(
+        weeklyProgressPhotoId,
+        'Weekly Progress Photo',
+        'Time for your weekly progress photo! Track your transformation.',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'progress_photo',
+            'Progress Photos',
+            channelDescription: 'Weekly progress photo reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      payload: 'progress_photo',
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: 'progress_photo',
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notification_progress_photo', enabled);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_progress_photo', enabled);
+    } catch (e) {
+      print('Error scheduling progress photo reminder: $e');
+    }
   }
 
   // Schedule weekly weigh-in reminder
@@ -212,32 +408,42 @@ class NotificationsController {
 
     if (!enabled) return;
 
+    // Check permission before scheduling
+    if (!await canScheduleExactAlarms()) {
+      print('Cannot schedule exact alarms - permission not granted');
+      return;
+    }
+
     var scheduledDate = _nextInstanceOfWeekday(dayOfWeek, hour);
 
-    await _notifications.zonedSchedule(
-      weeklyWeightId,
-      'Weekly Weigh-In',
-      'Time to record your weight. Consistency is key!',
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'weight_tracking',
-          'Weight Tracking',
-          channelDescription: 'Weekly weigh-in reminders',
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _notifications.zonedSchedule(
+        weeklyWeightId,
+        'Weekly Weigh-In',
+        'Time to record your weight. Consistency is key!',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'weight_tracking',
+            'Weight Tracking',
+            channelDescription: 'Weekly weigh-in reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      payload: 'weight_tracking',
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: 'weight_tracking',
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notification_weight', enabled);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_weight', enabled);
+    } catch (e) {
+      print('Error scheduling weight reminder: $e');
+    }
   }
 
   // Schedule water intake reminders
@@ -253,6 +459,12 @@ class NotificationsController {
     }
 
     if (!enabled) return;
+
+    // Check permission before scheduling
+    if (!await canScheduleExactAlarms()) {
+      print('Cannot schedule exact alarms - permission not granted');
+      return;
+    }
 
     int notificationId = 100;
     for (int hour = startHour; hour <= endHour; hour += intervalHours) {
@@ -270,27 +482,31 @@ class NotificationsController {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
 
-      await _notifications.zonedSchedule(
-        notificationId++,
-        'Hydration Time',
-        'Remember to drink water! Stay hydrated.',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'water_intake',
-            'Water Reminders',
-            channelDescription: 'Reminders to drink water',
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
+      try {
+        await _notifications.zonedSchedule(
+          notificationId++,
+          'Hydration Time',
+          'Remember to drink water! Stay hydrated.',
+          scheduledDate,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'water_intake',
+              'Water Reminders',
+              channelDescription: 'Reminders to drink water',
+              importance: Importance.defaultImportance,
+              priority: Priority.defaultPriority,
+            ),
+            iOS: DarwinNotificationDetails(),
           ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-        payload: 'water_intake',
-      );
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+          payload: 'water_intake',
+        );
+      } catch (e) {
+        print('Error scheduling water reminder at hour $hour: $e');
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -306,6 +522,12 @@ class NotificationsController {
     await _notifications.cancel(birthdayId);
 
     if (!enabled || user?.birthdate == null) return;
+
+    // Check permission before scheduling
+    if (!await canScheduleExactAlarms()) {
+      print('Cannot schedule exact alarms - permission not granted');
+      return;
+    }
 
     final birthdate = user!.birthdate!;
     final now = DateTime.now();
@@ -332,30 +554,34 @@ class NotificationsController {
       );
     }
 
-    await _notifications.zonedSchedule(
-      birthdayId,
-      'Happy Birthday!',
-      '${user.firstName}, wishing you a wonderful birthday! Keep crushing your goals!',
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'birthday',
-          'Birthday',
-          channelDescription: 'Birthday notifications',
-          importance: Importance.max,
-          priority: Priority.max,
+    try {
+      await _notifications.zonedSchedule(
+        birthdayId,
+        'Happy Birthday!',
+        '${user.firstName}, wishing you a wonderful birthday! Keep crushing your goals!',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'birthday',
+            'Birthday',
+            channelDescription: 'Birthday notifications',
+            importance: Importance.max,
+            priority: Priority.max,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-      payload: 'birthday',
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+        payload: 'birthday',
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notification_birthday', enabled);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notification_birthday', enabled);
+    } catch (e) {
+      print('Error scheduling birthday notification: $e');
+    }
   }
 
   // Helper method to get next instance of a specific weekday
@@ -431,6 +657,7 @@ class NotificationsController {
   }
 
   // ============== API Integration Methods ==============
+  // (Keep all your existing API methods unchanged)
 
   /// Fetch notification preferences from the backend
   static Future<NotificationPreferences?> fetchPreferencesFromApi() async {
@@ -441,7 +668,6 @@ class NotificationsController {
         final data = jsonDecode(response.body);
         return NotificationPreferences.fromJson(data);
       } else if (response.statusCode == 401) {
-        // Token expired or invalid - return null to trigger login
         print('Authentication failed - token may be expired');
         return null;
       } else {
@@ -498,28 +724,45 @@ class NotificationsController {
   }
 
   /// Sync local preferences with backend and reschedule notifications
-  static Future<void> syncPreferencesWithApi(UserModel? user) async {
-    final apiPreferences = await fetchPreferencesFromApi();
+  /// Sync local preferences with backend and reschedule notifications
+static Future<void> syncPreferencesWithApi(UserModel? user) async {
+  print('Starting notification sync...');
+  
+  // FIRST: Cancel all existing notifications
+  await clearAllPendingNotifications();
+  
+  final apiPreferences = await fetchPreferencesFromApi();
 
-    if (apiPreferences != null) {
-      // Update local SharedPreferences to match backend
-      final prefs = await SharedPreferences.getInstance();
+  if (apiPreferences != null) {
+    print('API preferences fetched successfully');
+    
+    // Update local SharedPreferences to match backend
+    final prefs = await SharedPreferences.getInstance();
 
-      await prefs.setBool('notification_daily_planning', apiPreferences.dailyPlanning.enabled);
-      await prefs.setBool('notification_day_rating', apiPreferences.dayRating.enabled);
-      await prefs.setBool('notification_progress_photo', apiPreferences.progressPhoto.enabled);
-      await prefs.setBool('notification_weight', apiPreferences.weightTracking.enabled);
-      await prefs.setBool('notification_water', apiPreferences.waterReminders.enabled);
-      await prefs.setBool('notification_birthday', apiPreferences.birthday.enabled);
+    await prefs.setBool('notification_daily_planning', apiPreferences.dailyPlanning.enabled);
+    await prefs.setBool('notification_day_rating', apiPreferences.dayRating.enabled);
+    await prefs.setBool('notification_progress_photo', apiPreferences.progressPhoto.enabled);
+    await prefs.setBool('notification_weight', apiPreferences.weightTracking.enabled);
+    await prefs.setBool('notification_water', apiPreferences.waterReminders.enabled);
+    await prefs.setBool('notification_birthday', apiPreferences.birthday.enabled);
 
-      if (apiPreferences.waterReminders.intervalHours != null) {
-        await prefs.setInt('notification_water_interval', apiPreferences.waterReminders.intervalHours!);
-      }
-
-      // Reschedule all notifications based on synced preferences
-      await rescheduleAllNotifications(user);
+    if (apiPreferences.waterReminders.intervalHours != null) {
+      await prefs.setInt('notification_water_interval', apiPreferences.waterReminders.intervalHours!);
     }
+
+    print('Scheduling notifications with proper payloads...');
+    
+    // Reschedule all notifications based on synced preferences
+    await rescheduleAllNotifications(user);
+    
+    // Debug: Show what's scheduled
+    await getPendingNotificationIds();
+    
+    print('Notification sync complete');
+  } else {
+    print('Failed to fetch API preferences');
   }
+}
 
   /// Convert current local settings to NotificationPreferences object
   static Future<NotificationPreferences> getCurrentPreferences() async {
@@ -538,12 +781,12 @@ class NotificationsController {
       ),
       progressPhoto: NotificationPreference(
         enabled: settings['progress_photo'] ?? false,
-        day: 'monday',  // Changed from 1
+        day: 'monday',
         time: '09:00',
       ),
       weightTracking: NotificationPreference(
         enabled: settings['weight'] ?? false,
-        day: 'monday',  // Changed from 1
+        day: 'monday',
         time: '08:00',
       ),
       waterReminders: NotificationPreference(

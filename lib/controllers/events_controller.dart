@@ -20,7 +20,7 @@ class EventsController {
     bool includeRepeating = true,
   }) async {
     try {
-      String endpoint = 'events/?include_repeating=$includeRepeating';
+      String endpoint = '/events/?include_repeating=$includeRepeating';
       
       if (userId != null) {
         endpoint += '&user_id=$userId';
@@ -53,7 +53,7 @@ class EventsController {
   static Future<Event?> createEvent(Event event) async {
     try {
       final response = await ChosenApi.post(
-        'events/',
+        '/events/',
         event.toJson(),
         auth: true,
         headers: _getTimezoneHeaders(),
@@ -74,7 +74,7 @@ class EventsController {
   static Future<Event?> updateEvent(int eventId, Map<String, dynamic> updates) async {
     try {
       final response = await ChosenApi.patch(
-        'events/$eventId',
+        '/events/$eventId',
         updates,
         auth: true,
         headers: _getTimezoneHeaders(),
@@ -95,7 +95,7 @@ class EventsController {
   static Future<bool> deleteEvent(int eventId) async {
     try {
       final response = await ChosenApi.delete(
-        'events/$eventId',
+        '/events/$eventId',
         auth: true,
         headers: _getTimezoneHeaders(),
       );
@@ -114,7 +114,7 @@ class EventsController {
   static Future<Event?> getEvent(int eventId) async {
     try {
       final response = await ChosenApi.get(
-        'events/$eventId',
+        '/events/$eventId',
         auth: true,
         headers: _getTimezoneHeaders(),
       );

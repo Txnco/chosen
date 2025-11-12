@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:chosen/models/message.dart';
 import 'package:chosen/controllers/message_controller.dart';
 import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/config/app_theme.dart';
-
 
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
@@ -23,26 +23,58 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final UserController _userController = UserController();
+  Timer? _pollTimer;
   bool _isLoading = true;
   bool _isInitializing = true;
   bool _isSending = false;
+  bool _showScrollButton = false;
+  bool _isAtBottom = true;
   List<Message> _messages = [];
   int? _currentUserId;
   String? _currentUserProfilePicture;
   String? _error;
+  int _newMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
     _currentUserId = widget.currentUserId;
+    _scrollController.addListener(_onScroll);
     _initializeChat();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      final atBottom = _scrollController.position.pixels >= 
+          _scrollController.position.maxScrollExtent - 50;
+      
+      if (atBottom != _isAtBottom) {
+        setState(() {
+          _isAtBottom = atBottom;
+          _showScrollButton = !atBottom;
+          if (atBottom) {
+            _newMessageCount = 0;
+          }
+        });
+      }
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (mounted && !_isLoading) {
+        _loadMessagesQuietly();
+      }
+    });
   }
 
   Future<void> _initializeChat() async {
@@ -119,6 +151,31 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _loadMessagesQuietly() async {
+    try {
+      if (widget.conversation.id == null) return;
+
+      final messages = await MessageController.getMessages(widget.conversation.id!);
+      
+      if (mounted && messages.length != _messages.length) {
+        final oldCount = _messages.length;
+        setState(() {
+          _messages = messages;
+          if (!_isAtBottom) {
+            _newMessageCount += messages.length - oldCount;
+          }
+        });
+        
+        // Only auto-scroll if user was already at bottom
+        if (_isAtBottom) {
+          _scrollToBottom();
+        }
+      }
+    } catch (e) {
+      print('Error loading messages quietly: $e');
+    }
+  }
+
   Future<void> _refreshMessages() async {
     setState(() {
       _isLoading = true;
@@ -136,14 +193,18 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        if (animated) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        } else {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
       }
     });
   }
@@ -250,34 +311,73 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          if (_error != null) _buildErrorBanner(),
-          Expanded(
-            child: _isInitializing 
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(color: theme.colorScheme.primary),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Učitavanje poruka...',
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
-                          fontSize: 16,
-                        ),
+          Column(
+            children: [
+              if (_error != null) _buildErrorBanner(),
+              Expanded(
+                child: _isInitializing 
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: theme.colorScheme.primary),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Učitavanje poruka...',
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _refreshMessages,
-                  color: theme.colorScheme.primary,
-                  child: _buildMessagesList(),
-                ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _refreshMessages,
+                      color: theme.colorScheme.primary,
+                      child: _buildMessagesList(),
+                    ),
+              ),
+              _buildMessageInput(),
+            ],
           ),
-          _buildMessageInput(),
+          if (_showScrollButton && _newMessageCount > 0)
+            Positioned(
+              bottom: 80,
+              right: 16,
+              child: FloatingActionButton.small(
+                onPressed: () {
+                  setState(() {
+                    _newMessageCount = 0;
+                  });
+                  _scrollToBottom();
+                },
+                backgroundColor: theme.colorScheme.primary,
+                child: Badge(
+                  label: Text(_newMessageCount.toString()),
+                  backgroundColor: Colors.red,
+                  child: Icon(
+                    Icons.arrow_downward,
+                    color: theme.colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            )
+          else if (_showScrollButton)
+            Positioned(
+              bottom: 80,
+              right: 16,
+              child: FloatingActionButton.small(
+                onPressed: _scrollToBottom,
+                backgroundColor: theme.colorScheme.primary,
+                child: Icon(
+                  Icons.arrow_downward,
+                  color: theme.colorScheme.onPrimary,
+                ),
+              ),
+            ),
         ],
       ),
     );
