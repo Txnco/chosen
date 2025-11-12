@@ -4,12 +4,21 @@ import 'package:chosen/models/notification_preferences.dart';
 import 'package:chosen/models/user.dart';
 
 class NotificationProvider extends ChangeNotifier {
+  // Enabled states
   bool _dailyPlanning = true;
   bool _dayRating = true;
   bool _progressPhoto = true;
   bool _weight = true;
   bool _water = true;
   bool _birthday = true;
+  
+  // Store full preferences to preserve time/day/interval values
+  NotificationPreference? _dailyPlanningPrefs;
+  NotificationPreference? _dayRatingPrefs;
+  NotificationPreference? _progressPhotoPrefs;
+  NotificationPreference? _weightPrefs;
+  NotificationPreference? _waterPrefs;
+  NotificationPreference? _birthdayPrefs;
   
   String? _errorMessage;
   bool _isLoading = false;
@@ -38,6 +47,15 @@ class NotificationProvider extends ChangeNotifier {
       final prefs = await NotificationsController.fetchPreferencesFromApi();
       
       if (prefs != null) {
+        // Store full preference objects to preserve all settings
+        _dailyPlanningPrefs = prefs.dailyPlanning;
+        _dayRatingPrefs = prefs.dayRating;
+        _progressPhotoPrefs = prefs.progressPhoto;
+        _weightPrefs = prefs.weightTracking;
+        _waterPrefs = prefs.waterReminders;
+        _birthdayPrefs = prefs.birthday;
+        
+        // Update enabled states
         _dailyPlanning = prefs.dailyPlanning.enabled;
         _dayRating = prefs.dayRating.enabled;
         _progressPhoto = prefs.progressPhoto.enabled;
@@ -55,14 +73,35 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   /// Build NotificationPreferences from current provider state
+  /// This preserves existing time/day/interval values
   NotificationPreferences _buildCurrentPreferences() {
     return NotificationPreferences(
-      dailyPlanning: NotificationPreference(enabled: _dailyPlanning, time: '20:00'),
-      dayRating: NotificationPreference(enabled: _dayRating, time: '20:00'),
-      progressPhoto: NotificationPreference(enabled: _progressPhoto, day: 'monday', time: '09:00'),  // Changed from 1
-      weightTracking: NotificationPreference(enabled: _weight, day: 'monday', time: '08:00'),  // Changed from 1
-      waterReminders: NotificationPreference(enabled: _water, intervalHours: 2),
-      birthday: NotificationPreference(enabled: _birthday, time: '09:00'),
+      dailyPlanning: NotificationPreference(
+        enabled: _dailyPlanning,
+        time: _dailyPlanningPrefs?.time ?? '20:00',
+      ),
+      dayRating: NotificationPreference(
+        enabled: _dayRating,
+        time: _dayRatingPrefs?.time ?? '20:00',
+      ),
+      progressPhoto: NotificationPreference(
+        enabled: _progressPhoto,
+        day: _progressPhotoPrefs?.day ?? 'monday',
+        time: _progressPhotoPrefs?.time ?? '09:00',
+      ),
+      weightTracking: NotificationPreference(
+        enabled: _weight,
+        day: _weightPrefs?.day ?? 'monday',
+        time: _weightPrefs?.time ?? '08:00',
+      ),
+      waterReminders: NotificationPreference(
+        enabled: _water,
+        intervalHours: _waterPrefs?.intervalHours ?? 2,
+      ),
+      birthday: NotificationPreference(
+        enabled: _birthday,
+        time: _birthdayPrefs?.time ?? '09:00',
+      ),
     );
   }
 
@@ -158,7 +197,11 @@ class NotificationProvider extends ChangeNotifier {
       return false;
     }
 
-    await NotificationsController.scheduleWaterReminders(enabled: value, intervalHours: 2);
+    final intervalHours = _waterPrefs?.intervalHours ?? 2;
+    await NotificationsController.scheduleWaterReminders(
+      enabled: value,
+      intervalHours: intervalHours,
+    );
     return true;
   }
 
@@ -215,6 +258,9 @@ class NotificationProvider extends ChangeNotifier {
       return false;
     }
 
+    // Reload to get fresh preferences from server
+    await loadSettings(user: user);
+    
     // Reschedule all notifications
     await NotificationsController.rescheduleAllNotifications(user);
     return true;
