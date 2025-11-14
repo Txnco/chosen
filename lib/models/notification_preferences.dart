@@ -23,12 +23,6 @@ class NotificationPreference {
     );
   }
 
-  static int? _parseDayString(String? day) {
-    if (day == null) return null;
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    final index = days.indexOf(day.toLowerCase());
-    return index >= 0 ? index + 1 : 1;
-  }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {

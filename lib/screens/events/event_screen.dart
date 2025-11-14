@@ -1,7 +1,5 @@
 // lib/screens/events/event_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:chosen/controllers/events_controller.dart';
 import 'package:chosen/controllers/user_controller.dart';
 import 'package:chosen/models/events.dart';

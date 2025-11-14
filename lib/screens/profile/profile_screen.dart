@@ -168,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
+                          child: const Text('Odustani'),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
@@ -184,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (result != null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Weight saved successfully!'),
+                                    content: Text('Težina uspješno spremljena!'),
                                     backgroundColor: Colors.green,
                                   ),
                                 );
@@ -192,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Failed to save weight'),
+                                    content: Text('Neuspješno spremanje težine'),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
@@ -206,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text('Save'),
+                          child: const Text('Spremi'),
                         ),
                       ],
                     ),
@@ -414,7 +414,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const Icon(Icons.photo_camera_outlined, color: Colors.black, size: 24),
                         const SizedBox(width: 12),
                         const Text(
-                          'Add Progress Photo',
+                          'Dodaj sliku napredka',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
@@ -425,7 +425,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'Select photo angle:',
+                      'Odaberi kut slike:',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -435,15 +435,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        _buildAngleButton('Front', PhotoAngle.front, selectedAngle, (angle) {
+                        _buildAngleButton('Prednja', PhotoAngle.front, selectedAngle, (angle) {
                           setState(() => selectedAngle = angle);
                         }),
                         const SizedBox(width: 8),
-                        _buildAngleButton('Side', PhotoAngle.side, selectedAngle, (angle) {
+                        _buildAngleButton('Sa strane', PhotoAngle.side, selectedAngle, (angle) {
                           setState(() => selectedAngle = angle);
                         }),
                         const SizedBox(width: 8),
-                        _buildAngleButton('Back', PhotoAngle.back, selectedAngle, (angle) {
+                        _buildAngleButton('Stražnja', PhotoAngle.back, selectedAngle, (angle) {
                           setState(() => selectedAngle = angle);
                         }),
                       ],
@@ -495,7 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               }
                             },
                             icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                            label: const Text('Camera'),
+                            label: const Text('Kamera'),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -511,7 +511,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               }
                             },
                             icon: const Icon(Icons.photo_library_outlined, size: 18),
-                            label: const Text('Gallery'),
+                            label: const Text('Galerija'),
                           ),
                         ),
                       ],
@@ -522,7 +522,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
+                          child: const Text('Odustani'),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
@@ -541,7 +541,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             child: CircularProgressIndicator(strokeWidth: 2),
                                           ),
                                           SizedBox(width: 16),
-                                          Text('Uploading photo...'),
+                                          Text('Prijenos slike...'),
                                         ],
                                       ),
                                       duration: Duration(seconds: 30),
@@ -560,7 +560,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   if (result != null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Progress photo saved!'),
+                                        content: Text('Slika uspješno spremljena!'),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
@@ -568,7 +568,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Failed to save photo'),
+                                        content: Text('Pogreška kod spremanja slike'),
                                         backgroundColor: Colors.red,
                                       ),
                                     );
@@ -582,7 +582,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text('Save'),
+                          child: const Text('Spremi'),
                         ),
                       ],
                     ),
@@ -629,7 +629,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String getFullName() {
-    if (_user == null) return 'Loading...';
+    if (_user == null) return 'Učitavanje...';
     return '${_user!.firstName} ${_user!.lastName}';
   }
 
@@ -676,7 +676,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Profile',
+          'Profil',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
@@ -688,10 +688,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'settings') {
-                // Navigate to settings when implemented
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings coming soon!')),
-                );
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/settings');
+                }
               } else if (value == 'logout') {
                 await _authController.logout();
                 if (context.mounted) {
@@ -706,7 +705,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Icon(Icons.settings_outlined, color: Colors.grey[600], size: 18),
                     const SizedBox(width: 12),
-                    const Text('Settings', style: TextStyle(fontSize: 14)),
+                    const Text('Postavke', style: TextStyle(fontSize: 14)),
                   ],
                 ),
               ),
@@ -717,7 +716,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Icon(Icons.logout_outlined, color: Colors.red[400], size: 18),
                     const SizedBox(width: 12),
-                    Text('Logout', style: TextStyle(fontSize: 14, color: Colors.red[400])),
+                    Text('Odjava', style: TextStyle(fontSize: 14, color: Colors.red[400])),
                   ],
                 ),
               ),
@@ -983,7 +982,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   SizedBox(width: 16),
-                  Text('Uploading profile picture...'),
+                  Text('Prijenos slike profila...'),
                 ],
               ),
               duration: Duration(seconds: 30),
@@ -1826,11 +1825,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _getAngleDisplayName(PhotoAngle angle) {
     switch (angle) {
       case PhotoAngle.front:
-        return 'Front';
+        return 'Prednja';
       case PhotoAngle.side:
-        return 'Side';
+        return 'Sa strane';
       case PhotoAngle.back:
-        return 'Back';
+        return 'Stražnja';
     }
   }
 
@@ -1925,7 +1924,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  String _formatDateShort(DateTime date) {
-    return '${date.day}/${date.month}';
-  }
 }

@@ -5,8 +5,8 @@ import 'dart:io';
 
 
 class ChosenApi {
-  // static const String baseUrl = 'https://admin.chosen-international.com/api/'; // or your production IP/domain
-  static const String baseUrl = 'http://10.0.2.2:8000'; // or your production IP/domain
+  static const String baseUrl = 'https://admin.chosen-international.com/api/'; // or your production IP/domain
+  //static const String baseUrl = 'http://10.0.2.2:8000'; // or your production IP/domain
   static const String uploadsUrl = 'https://admin.chosen-international.com/public'; // or your production IP/domain
   static final _storage = FlutterSecureStorage();
 

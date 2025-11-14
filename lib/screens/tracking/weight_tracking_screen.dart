@@ -59,7 +59,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                         const Icon(Icons.monitor_weight_outlined, color: Colors.black, size: 24),
                         const SizedBox(width: 12),
                         const Text(
-                          'Add Weight Entry',
+                          'Dodaj zapis težine',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
@@ -76,8 +76,8 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                       ],
                       decoration: InputDecoration(
-                        labelText: 'Weight (kg)',
-                        hintText: 'Enter your weight',
+                        labelText: 'Težina (kg)',
+                        hintText: 'Unesite svoju težinu',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -155,7 +155,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                               if (result != null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Weight saved successfully!'),
+                                    content: Text('Upis težine je uspješno spremljen!'),
                                     backgroundColor: Colors.green,
                                   ),
                                 );
@@ -229,7 +229,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Weight Tracking',
+          'Praćenje težine',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
@@ -396,7 +396,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Weight Progress',
+            'Napredak težine',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -414,7 +414,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                       Icon(Icons.show_chart, size: 48, color: Colors.grey[400]),
                       const SizedBox(height: 12),
                       Text(
-                        'No weight data yet',
+                        'Još nema podataka o težini',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[600],
@@ -422,7 +422,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Add your first weight entry to see the chart',
+                        'Dodajte svoj prvi unos težine da biste vidjeli grafikon',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[500],
@@ -551,7 +551,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Weight History',
+                'Povijest težine',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -589,7 +589,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                       Icon(Icons.monitor_weight_outlined, size: 48, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
-                        'No weight entries yet',
+                        'Još nema unosa težine',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[600],
@@ -598,7 +598,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Start tracking your weight progress!',
+                        'Počnite pratiti napredak u svojoj težini!',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[500],
